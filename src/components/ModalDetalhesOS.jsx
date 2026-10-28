@@ -41,8 +41,8 @@ export default function ModalDetalhesOS({ os, onClose }) {
   
   // Lista de Contatos (CONTATO_1 e CONTATO_2)
   const listaContatos = [];
-  const c1 = os.contato_1 || os.CONTATO_1 || os.contato;
-  const c2 = os.contato_2 || os.CONTATO_2;
+  const c1 = os.telefone_1;
+  const c2 = os.telefone_2;
   if (c1 && String(c1).trim()) listaContatos.push(String(c1).trim());
   if (c2 && String(c2).trim() && String(c2).trim() !== String(c1).trim()) listaContatos.push(String(c2).trim());
 
@@ -203,7 +203,7 @@ export default function ModalDetalhesOS({ os, onClose }) {
               Cliente
             </div>
             <h2 className="text-lg font-bold text-brand-dark">
-              {os.cliente || 'Nome não informado'}
+              {os.cliente_nome || 'Nome não informado'}
             </h2>
           </div>
 
@@ -234,51 +234,49 @@ export default function ModalDetalhesOS({ os, onClose }) {
           </div>
 
           {/* Lista de Contatos: Telefone e WhatsApp */}
-          {listaContatos.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Contatos do Cliente
-              </div>
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              <Phone className="w-3.5 h-3.5 text-slate-400" />
+              Contatos
+            </div>
+            {listaContatos.length > 0 ? (
               <div className="space-y-2">
                 {listaContatos.map((numero, idx) => {
                   const cleanNum = numero.replace(/\D/g, '');
                   return (
-                    <div 
+                    <div
                       key={idx}
-                      className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200"
+                      className="flex items-center justify-between gap-2 p-2.5 bg-white rounded-lg border border-slate-200"
                     >
-                      <span className="text-sm font-semibold text-slate-800">
+                      <span className="text-sm font-semibold text-slate-800 font-mono">
                         {numero}
                       </span>
-                      <div className="flex items-center gap-2">
-                        {/* Botão Discador Nativo */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <a
                           href={`tel:${cleanNum}`}
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-bold hover:bg-blue-100 active:scale-95 transition-all"
-                          title="Ligar para cliente"
                         >
                           <Phone className="w-3.5 h-3.5" />
-                          <span>Ligar</span>
+                          Ligar
                         </a>
-
-                        {/* Botão WhatsApp */}
                         <a
                           href={`https://wa.me/55${cleanNum}?text=${encodeURIComponent(`Olá, sou o técnico da Sinuelo referente à retirada da O.S. ${os.numero_os}.`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold hover:bg-emerald-100 active:scale-95 transition-all"
-                          title="Abrir WhatsApp"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
-                          <span>WhatsApp</span>
+                          WhatsApp
                         </a>
                       </div>
                     </div>
                   );
                 })}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-sm text-slate-400 italic">Nenhum contato informado.</p>
+            )}
+          </div>
 
           {/* Destaque de Observações da OS: Posicionado logo acima dos botões de ação */}
           {obsCliente && (

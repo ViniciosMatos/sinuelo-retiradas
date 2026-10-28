@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { db } from '../db/db';
 import { 
   Clock, 
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 export default function CardOS({ os, onClick }) {
+  const [contatosAbertos, setContatosAbertos] = useState(false);
   if (!os) return null;
 
   const temHorarioMarcado = Boolean(os.horario_marcado && os.horario_marcado.trim() !== '');
@@ -77,6 +78,13 @@ export default function CardOS({ os, onClick }) {
       )}
 
       <div className="flex-1 p-4 flex flex-col gap-2.5">
+        {/* Badge NOVA */}
+        {os.is_nova && (
+          <div className="self-start inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-400 text-emerald-950 border border-emerald-500 tracking-wide">
+            <span>✦ NOVA</span>
+          </div>
+        )}
+
         {/* Cabeçalho do Card: OS, Turno e Badge de Horário */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-1 text-xs font-semibold text-brand bg-slate-100 px-2.5 py-1 rounded-md">
@@ -104,7 +112,7 @@ export default function CardOS({ os, onClick }) {
         <div className="flex items-start gap-2">
           <User className="w-5 h-5 text-brand mt-0.5 flex-shrink-0" />
           <h3 className="font-bold text-base text-brand-dark leading-snug break-words">
-            {os.cliente || 'Cliente não informado'}
+            {os.cliente_nome || 'Cliente não informado'}
           </h3>
         </div>
 
@@ -116,7 +124,7 @@ export default function CardOS({ os, onClick }) {
             {os.bairro ? ` - ${os.bairro}` : ''}
             {os.cidade ? `, ${os.cidade}` : ''}
           </p>
-        </div>
+        </div>        
 
         {/* Selo de Alerta de Observação do Cliente no Card Fechado */}
         {temObservacao && (

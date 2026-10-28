@@ -25,12 +25,35 @@ export async function baixarCargaDoDia() {
     return { total: 0, ordens: [] };
   }
 
-  // 2. Grava ou atualiza no Dexie com os IDs reais do Supabase
-  await db.ordens_servico.bulkPut(ordens);
+  // 2. Deduplicação in-memory: garante que não há numero_os repetido no lote
+  const dadosUnicos = ordens.reduce((acc, os) => {
+    if (!acc.some((item) => item.numero_os === os.numero_os)) {
+      acc.push(os);
+    }
+    return acc;
+  }, []);
 
-  // 3. Busca equipamentos previstos associados às OS baixadas (se existirem na nuvem)
+  // 3. Grava no Dexie com fallback: se ConstraintError/corrupção → limpa tabela e retenta
   try {
-    const osIds = ordens.map((o) => o.id).filter(Boolean);
+    await db.ordens_servico.bulkPut(dadosUnicos);
+  } catch (dexieErr) {
+    const isConstraint =
+      dexieErr?.name === 'ConstraintError' ||
+      dexieErr?.inner?.name === 'ConstraintError' ||
+      String(dexieErr).includes('ConstraintError');
+
+    console.warn(
+      `[syncService] bulkPut falhou (${dexieErr?.name}). ${isConstraint ? 'ConstraintError detectado — limpando tabela local e retentando.' : 'Erro inesperado — retentando após clear.'}`,
+      dexieErr
+    );
+
+    await db.ordens_servico.clear();
+    await db.ordens_servico.bulkPut(dadosUnicos);
+  }
+
+  // 4. Busca equipamentos previstos associados às OS baixadas (se existirem na nuvem)
+  try {
+    const osIds = dadosUnicos.map((o) => o.id).filter(Boolean);
     if (osIds.length > 0) {
       const { data: equipamentos, error: eqError } = await supabase
         .from('equipamentos')
@@ -45,7 +68,7 @@ export async function baixarCargaDoDia() {
     console.warn('Aviso ao sincronizar equipamentos previstos:', eqErr);
   }
 
-  return { total: ordens.length, ordens };
+  return { total: dadosUnicos.length, ordens: dadosUnicos };
 }
 
 /**
