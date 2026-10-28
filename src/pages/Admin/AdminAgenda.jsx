@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabase';
+import { getTodayBR, formatDateBR, addDiasBR } from '../../utils/dateUtils';
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,21 +23,10 @@ import {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function formatarData(dateStr) {
-  if (!dateStr) return '';
-  const [y, m, d] = dateStr.split('-');
-  return `${d}/${m}/${y}`;
-}
+const formatarData = formatDateBR;
+const addDias = addDiasBR;
+const hojeISO = getTodayBR;
 
-function addDias(dateStr, n) {
-  const d = new Date(dateStr + 'T12:00:00');
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split('T')[0];
-}
-
-function hojeISO() {
-  return new Date().toISOString().split('T')[0];
-}
 
 // ─── Modal de Edição ─────────────────────────────────────────────────────────
 
@@ -292,42 +282,13 @@ function CardOSAdmin({ os, tecnicos, onEditar }) {
 
         {/* Contatos expansíveis */}
         {os.telefone_1 && (
-          <div className="flex flex-col gap-1.5">
-            <button
-              type="button"
-              onClick={() => setContatosAbertos((v) => !v)}
-              className="self-start inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95 transition-all border border-slate-200"
-            >
-              <span>📞</span>
-              <span>{contatosAbertos ? 'Ocultar Contatos' : 'Ver Contatos'}</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className={`w-3 h-3 transition-transform ${contatosAbertos ? 'rotate-180' : ''}`}
-                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            {contatosAbertos && (
-              <div className="flex flex-wrap gap-2 pl-0.5">
-                <a href={`tel:${os.telefone_1}`} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">
-                  📞 Ligar ({os.telefone_1})
-                </a>
-                <a href={`https://wa.me/55${os.telefone_1.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-all">
-                  💬 WA 1
-                </a>
-                {os.telefone_2 && (
-                  <>
-                    <a href={`tel:${os.telefone_2}`} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all">
-                      📞 Ligar 2 ({os.telefone_2})
-                    </a>
-                    <a href={`https://wa.me/55${os.telefone_2.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-all">
-                      💬 WA 2
-                    </a>
-                  </>
-                )}
-              </div>
-            )}
+          <div className="text-xs text-slate-600 font-medium">
+            {os.telefone_1}
+          </div>
+        )}
+        {os.telefone_2 && (
+          <div className="text-xs text-slate-600 font-medium">
+            {os.telefone_2}
           </div>
         )}
 

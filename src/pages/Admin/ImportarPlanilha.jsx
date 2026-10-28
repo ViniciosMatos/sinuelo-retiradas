@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../../supabase';
+import { getTodayBR } from '../../utils/dateUtils';
 import {
   FileSpreadsheet,
   UploadCloud,
@@ -22,7 +23,7 @@ export default function ImportarPlanilha() {
   const [importacaoAdicional, setImportacaoAdicional] = useState(false);
 
   // Campos de alocação de agenda
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = getTodayBR();
   const [dataAgendada, setDataAgendada] = useState(hoje);
   const [tecnicoId, setTecnicoId] = useState('');
   const [tecnicos, setTecnicos] = useState([]);
