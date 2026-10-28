@@ -120,6 +120,12 @@ export default function App() {
                 )
               }
             />
+            {userRole === 'ADMIN' && (
+              <>
+                <Route path="/admin" element={<AdminDashboard session={session} />} />
+                <Route path="/admin/importar" element={<AdminDashboard session={session} paginaInicial="IMPORTAR" />} />
+              </>
+            )}
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </>

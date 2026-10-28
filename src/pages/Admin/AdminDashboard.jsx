@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../../supabase';
+import ImportarPlanilha from './ImportarPlanilha';
+import AdminAgenda from './AdminAgenda';
 import { 
   LayoutDashboard, 
   FileSpreadsheet, 
@@ -11,11 +13,12 @@ import {
   Users,
   CheckCircle2,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  CalendarDays
 } from 'lucide-react';
 
-export default function AdminDashboard({ session }) {
-  const [paginaAtiva, setPaginaAtiva] = useState('PAINEL_GERAL'); // 'PAINEL_GERAL' | 'IMPORTAR' | 'EXPORTAR'
+export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL' }) {
+  const [paginaAtiva, setPaginaAtiva] = useState(paginaInicial); // 'PAINEL_GERAL' | 'IMPORTAR' | 'EXPORTAR'
   const [sidebarAberta, setSidebarAberta] = useState(false);
 
   const handleLogout = async () => {
@@ -28,6 +31,7 @@ export default function AdminDashboard({ session }) {
 
   const navItems = [
     { id: 'PAINEL_GERAL', rotulo: 'Painel Geral', icone: LayoutDashboard },
+    { id: 'AGENDA', rotulo: 'Agenda Geral', icone: CalendarDays },
     { id: 'IMPORTAR', rotulo: 'Importar Planilha', icone: FileSpreadsheet },
     { id: 'EXPORTAR', rotulo: 'Exportar Relatório', icone: FileDown },
   ];
@@ -207,14 +211,12 @@ export default function AdminDashboard({ session }) {
             </div>
           )}
 
+          {paginaAtiva === 'AGENDA' && (
+            <AdminAgenda />
+          )}
+
           {paginaAtiva === 'IMPORTAR' && (
-            <div className="bg-white p-8 rounded-2xl shadow-xs border border-slate-200 text-center space-y-3">
-              <FileSpreadsheet className="w-12 h-12 text-slate-400 mx-auto" />
-              <h2 className="text-lg font-bold text-slate-800">Módulo de Importação de Planilhas (Excel)</h2>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-                Em breve: faça o upload da lista de retiradas para distribuição automática de rotas para os técnicos.
-              </p>
-            </div>
+            <ImportarPlanilha />
           )}
 
           {paginaAtiva === 'EXPORTAR' && (

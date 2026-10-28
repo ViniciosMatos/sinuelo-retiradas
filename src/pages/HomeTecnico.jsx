@@ -10,8 +10,11 @@ export default function HomeTecnico() {
   const [abaAtiva, setAbaAtiva] = useState('PENDENTES'); // 'PENDENTES' | 'CONCLUIDAS'
   const [osSelecionada, setOsSelecionada] = useState(null);
 
+  // Lê direto do Dexie (IndexedDB) ordenado por ordem_importacao.
+  // useLiveQuery é reativo ao banco local — não dispara fetch de rede
+  // e não recarrega ao trocar de aba / voltar do WhatsApp / Maps.
   const ordens = useLiveQuery(async () => {
-    return await db.ordens_servico.toArray();
+    return await db.ordens_servico.orderBy('ordem_importacao').toArray();
   }, []);
 
   const ordensFiltradas = (ordens || []).filter((os) => {
