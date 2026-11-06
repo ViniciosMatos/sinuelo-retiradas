@@ -96,7 +96,7 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
         const { count, error: erroTecnicos } = await supabase
           .from('usuarios')
           .select('id', { count: 'exact', head: true })
-          .or('role.eq.TECNICO,perfil.eq.TECNICO');
+          .eq('role', 'TECNICO');
         if (!erroTecnicos && count !== null) {
           countTecnicos = count;
         }

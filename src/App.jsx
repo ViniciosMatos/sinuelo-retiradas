@@ -30,20 +30,8 @@ export default function App() {
         setUserRole(data.role.toUpperCase());
         return;
       }
-
-      // 2. Fallback caso a coluna seja 'login'
-      const { data: dataLogin, error: errorLogin } = await supabase
-        .from('usuarios')
-        .select('role')
-        .eq('login', userSession.user.email)
-        .single();
-
-      if (!errorLogin && dataLogin?.role) {
-        setUserRole(dataLogin.role.toUpperCase());
-        return;
-      }
     } catch (err) {
-      console.warn('Aviso ao consultar perfil de usuário no Supabase:', err);
+      console.warn('Aviso ao consultar role de usuário no Supabase:', err);
     }
 
     // Role padrão para operação de campo caso não encontre
@@ -92,7 +80,7 @@ export default function App() {
     };
   }, []);
 
-  // Ecrã de carregamento enquanto valida sessão e perfil
+  // Ecrã de carregamento enquanto valida sessão e role
   if (carregando) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-3">
@@ -104,7 +92,7 @@ export default function App() {
     );
   }
 
-  // Passo 2: Desvio de rotas baseado no perfil (Role-Based Routing)
+  // Passo 2: Desvio de rotas baseado no role (Role-Based Routing)
   return (
     <BrowserRouter>
       <Routes>

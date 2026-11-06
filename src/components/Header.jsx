@@ -56,10 +56,13 @@ export default function Header() {
     try {
       setBaixando(true);
       const resultado = await baixarCargaDoDia();
-      if (resultado.total === 0) {
+      if (resultado.total === 0 && (!resultado.pendentesPreservadas || resultado.pendentesPreservadas === 0)) {
         mostrarFeedback('Nenhuma nova O.S. pendente no Supabase.', 'info');
+      } else if (resultado.total === 0 && resultado.pendentesPreservadas > 0) {
+        mostrarFeedback(`${resultado.pendentesPreservadas} tarefa(s) pendente(s) localmente foram preservadas.`, 'info');
       } else {
-        mostrarFeedback(`${resultado.total} tarefa(s) baixada(s) com sucesso!`, 'sucesso');
+        const msg = `${resultado.total} tarefa(s) baixada(s)${resultado.pendentesPreservadas > 0 ? ` (${resultado.pendentesPreservadas} mantida(s) pendente(s))` : ''}!`;
+        mostrarFeedback(msg, 'sucesso');
       }
     } catch (err) {
       console.error('Erro ao baixar tarefas:', err);

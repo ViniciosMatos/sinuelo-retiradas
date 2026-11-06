@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import imageCompression from 'browser-image-compression';
 import { db } from '../db/db';
+import { sincronizarPendentes } from '../services/syncService';
 import { 
   X, 
   MapPin, 
@@ -16,7 +17,9 @@ import {
   Hash,
   Loader2,
   Trash2,
-  Cloud
+  Cloud,
+  Router,
+  Plus
 } from 'lucide-react';
 
 export default function ModalDetalhesOS({ os, onClose }) {
@@ -25,11 +28,36 @@ export default function ModalDetalhesOS({ os, onClose }) {
   // Estados dos fluxos secundários
   const [fluxoAtivo, setFluxoAtivo] = useState(null); // 'SUCESSO' | 'IMPRODUTIVA' | null
   
-  // Fluxo de Sucesso - Fotos (Array de File/Blob)
-  const [fotos, setFotos] = useState([]); // File/Blob[]
-  const [comprimindo, setComprimindo] = useState(false);
+  // Fotos indexadas por chave de equipamento: { [equipKey]: File/Blob }
+  const [fotos, setFotos] = useState({});
+  const [comprimindoKey, setComprimindoKey] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [equipamentosPrevistos, setEquipamentosPrevistos] = useState([]);
+  const [aparelhosExtras, setAparelhosExtras] = useState([]);
+
+  // URLs de preview estáveis (evita memory leak: cria 1x por Blob, revoga ao desmontar/trocar)
+  const previewUrls = useMemo(() => {
+    const mapa = {};
+    for (const [k, blob] of Object.entries(fotos)) {
+      if (blob instanceof Blob) {
+        mapa[k] = URL.createObjectURL(blob);
+      }
+    }
+    // Fotos de OS já concluída (array de Blobs locais)
+    const fotosConcluida = Array.isArray(os?.fotos_recolhimento) ? os.fotos_recolhimento : [];
+    fotosConcluida.forEach((f, idx) => {
+      if (f instanceof Blob) {
+        mapa[`concluida-${idx}`] = URL.createObjectURL(f);
+      }
+    });
+    return mapa;
+  }, [fotos, os?.fotos_recolhimento]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(previewUrls).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [previewUrls]);
 
   // Fluxo de Improdutiva
   const [motivoImprodutiva, setMotivoImprodutiva] = useState('Cliente ausente');
@@ -46,21 +74,64 @@ export default function ModalDetalhesOS({ os, onClose }) {
   if (c1 && String(c1).trim()) listaContatos.push(String(c1).trim());
   if (c2 && String(c2).trim() && String(c2).trim() !== String(c1).trim()) listaContatos.push(String(c2).trim());
 
-  const obsCliente = os.observacao_cliente || os.obs_cliente;
+  const obsCliente = os.observacao_cliente;
 
-  // Carrega quantidade de equipamentos previstos da OS no Dexie
+  // Carrega fotos rascunho persistidas no Dexie caso o app da câmera tenha reciclado a RAM
+  useEffect(() => {
+    let ativo = true;
+    async function carregarFotosSalvas() {
+      if (!os?.id) return;
+      try {
+        const osLocal = await db.ordens_servico.get(os.id);
+        if (ativo && (!osLocal?.status || osLocal?.status === 'PENDENTE')) {
+          if (osLocal?.fotos_por_equipamento && typeof osLocal.fotos_por_equipamento === 'object') {
+            setFotos(osLocal.fotos_por_equipamento);
+          } else if (Array.isArray(osLocal?.fotos_recolhimento) && osLocal.fotos_recolhimento.length > 0) {
+            const mapa = {};
+            osLocal.fotos_recolhimento.forEach((f, idx) => {
+              mapa[`equip-${idx}`] = f;
+            });
+            setFotos(mapa);
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar fotos locais do Dexie:', err);
+      }
+    }
+    carregarFotosSalvas();
+    return () => { ativo = false; };
+  }, [os?.id]);
+
+  // Carrega lista de equipamentos / MACs vinculados à OS no Dexie
+  // os.id pode ser: (a) UUID Supabase (string), (b) autoincrement Dexie (number)
+  // os_id nos equipamentos é sempre o UUID Supabase — buscar pelo campo 'id' real da OS local
   useEffect(() => {
     let ativo = true;
     async function carregarEquipamentos() {
-      if (!os?.id) return;
+      if (!os) return;
       try {
-        const os_id = os.id;
-        let items = await db.equipamentos.where({ os_id }).toArray();
-        if ((!items || items.length === 0) && typeof os_id === 'string' && !isNaN(Number(os_id))) {
-          items = await db.equipamentos.where({ os_id: Number(os_id) }).toArray();
+        let items = [];
+
+        // Tenta busca direta por os_id = os.id (funciona se os.id é o UUID Supabase)
+        if (os.id) {
+          items = await db.equipamentos.where({ os_id: os.id }).toArray();
         }
+
+        // Se não achou (os.id é autoincrement Dexie), tenta via numero_os para obter UUID real
+        if ((!items || items.length === 0) && os.numero_os) {
+          const osLocal = await db.ordens_servico.where({ numero_os: os.numero_os }).first();
+          // O campo 'id' da OS local pode ser autoincrement — o UUID Supabase fica no campo 'id' original
+          // se a OS foi salva com PUT preservando o UUID, buscamos por esse UUID
+          if (osLocal && osLocal.id && osLocal.id !== os.id) {
+            items = await db.equipamentos.where({ os_id: osLocal.id }).toArray();
+          }
+        }
+
+        // Se ainda não achou, equipamentos não foram sincronizados ainda para este dispositivo
+        if (!items) items = [];
+
         if (ativo) {
-          setEquipamentosPrevistos(items || []);
+          setEquipamentosPrevistos(items);
         }
       } catch (err) {
         console.error('Erro ao buscar equipamentos previstos no Dexie:', err);
@@ -68,14 +139,14 @@ export default function ModalDetalhesOS({ os, onClose }) {
     }
     carregarEquipamentos();
     return () => { ativo = false; };
-  }, [os?.id]);
+  }, [os?.id, os?.numero_os]);
 
-  // Passo 1: Fim do Base64 (Adoção de Blob)
-  const handleFotoChange = async (file) => {
+  // Compressão imediata no onChange e gravação persistente no Dexie.js por equipamento
+  const handleFotoEquipamento = async (key, file) => {
     if (!file) return;
 
     try {
-      setComprimindo(true);
+      setComprimindoKey(key);
       const options = {
         maxSizeMB: 0.2,
         maxWidthOrHeight: 1024,
@@ -83,62 +154,108 @@ export default function ModalDetalhesOS({ os, onClose }) {
       };
 
       const compressedFile = await imageCompression(file, options);
-      // Salva o próprio objeto File/Blob retornado diretamente no array do estado
-      setFotos((prev) => [...prev, compressedFile]);
+      const novasFotos = { ...fotos, [key]: compressedFile };
+      setFotos(novasFotos);
+
+      // Gravação local imediata no Dexie (offline-first & proteção contra RAM reciclada)
+      if (os?.id) {
+        await db.ordens_servico.update(os.id, {
+          fotos_por_equipamento: novasFotos,
+          fotos_recolhimento: Object.values(novasFotos).filter(Boolean),
+        });
+      }
     } catch (err) {
-      console.error('Erro na compressão da foto:', err);
+      console.error('Erro na compressão/gravação local da foto:', err);
       alert('Falha ao processar foto. Tente novamente.');
     } finally {
-      setComprimindo(false);
+      setComprimindoKey(null);
     }
   };
 
-  const handleRemoverFoto = (indexRemover) => {
-    setFotos((prev) => prev.filter((_, idx) => idx !== indexRemover));
+  const handleRemoverFotoEquipamento = async (key) => {
+    const novasFotos = { ...fotos };
+    delete novasFotos[key];
+    setFotos(novasFotos);
+
+    if (os?.id) {
+      await db.ordens_servico.update(os.id, {
+        fotos_por_equipamento: novasFotos,
+        fotos_recolhimento: Object.values(novasFotos).filter(Boolean),
+      });
+    }
   };
 
-  // Passo 3: A Lógica de Triagem (Malha Fina)
+  const handleAdicionarAparelhoExtra = () => {
+    const novoIndex = aparelhosExtras.length + 1;
+    setAparelhosExtras((prev) => [
+      ...prev,
+      { key: `extra-${Date.now()}`, mac_esperado: `Aparelho Extra #${novoIndex}`, isExtra: true },
+    ]);
+  };
+
+  // Lista unificada para o formulário de recolhimento
+  const listaRecolhimento = equipamentosPrevistos.length > 0 
+    ? [...equipamentosPrevistos, ...aparelhosExtras]
+    : [
+        { key: 'avulso-1', mac_esperado: 'Aparelho Recolhido (ONU/Roteador)', isPadrao: true },
+        ...aparelhosExtras
+      ];
+
+  // Cálculo da Flag de Triagem (requer_verificacao):
+  // Se MACs com foto < MACs recomendados e o número de recomendados for > 1, defina requer_verificacao = true.
+  // Caso contrário (1 recomendado e 1 recolhido, ou todos recolhidos), defina requer_verificacao = false.
+  const macsRecomendadosQtd = equipamentosPrevistos.length;
+  const macsComFotoQtd = equipamentosPrevistos.length > 0
+    ? equipamentosPrevistos.filter((eq) => {
+        const k = eq.id !== undefined && eq.id !== null ? String(eq.id) : (eq.mac_esperado || '');
+        return Boolean(fotos[k]);
+      }).length
+    : Object.keys(fotos).length;
+
+  const totalFotosAnexadas = Object.values(fotos).filter(Boolean).length;
+  const requerVerificacao = (macsRecomendadosQtd > 1 && macsComFotoQtd < macsRecomendadosQtd);
+  
+  // O botão 'Concluir' deve ser habilitado desde que haja pelo menos 1 foto de equipamento anexada
+  const podeConcluir = totalFotosAnexadas >= 1 && comprimindoKey === null && !salvando;
+
+  // Encerramento Produtivo com salvamento local no Dexie e disparo imediato em background
   const handleSalvarConclusao = async (e) => {
     e.preventDefault();
-    if (fotos.length === 0 || comprimindo || salvando) return;
+    if (!podeConcluir) return;
 
     try {
       setSalvando(true);
 
-      const os_id = os.id;
-      let previstos = await db.equipamentos.where({ os_id }).toArray();
-      if ((!previstos || previstos.length === 0) && typeof os_id === 'string' && !isNaN(Number(os_id))) {
-        previstos = await db.equipamentos.where({ os_id: Number(os_id) }).toArray();
-      }
-      previstos = previstos || [];
-
-      // CENÁRIO A (Triagem Automática): Se equipamentosPrevistos.length === 1 E fotos.length === 1
-      if (previstos.length === 1 && fotos.length === 1) {
-        await db.ordens_servico.update(os.id, {
-          status: 'CONCLUIDA',
-          requer_verificacao: false,
-          fotos_recolhimento: fotos,
-          data_finalizacao: new Date().toISOString()
-        });
-
-        if (previstos[0]?.id !== undefined) {
-          await db.equipamentos.update(previstos[0].id, {
-            foi_recolhido: true
+      // Atualiza status dos equipamentos no Dexie
+      for (const eq of equipamentosPrevistos) {
+        const k = eq.id !== undefined && eq.id !== null ? String(eq.id) : (eq.mac_esperado || '');
+        const recolhidoComFoto = Boolean(fotos[k]);
+        if (eq.id !== undefined && eq.id !== null) {
+          await db.equipamentos.update(eq.id, {
+            foi_recolhido: recolhidoComFoto,
           });
         }
-      } 
-      // CENÁRIO B (Requer Auditoria do Admin): Se equipamentosPrevistos.length === 1 E fotos.length > 1, OU se equipamentosPrevistos.length >= 2 (ou fallback)
-      else {
-        await db.ordens_servico.update(os.id, {
-          status: 'CONCLUIDA',
-          requer_verificacao: true,
-          fotos_recolhimento: fotos,
-          data_finalizacao: new Date().toISOString()
-        });
-        // NÃO altera nada na db.equipamentos (mantém foi_recolhido: false)
       }
 
+      const arrayFotosBlobs = Object.values(fotos).filter(Boolean);
+
+      // Salva no Dexie local com status_sincronizacao = 'pendente'
+      await db.ordens_servico.update(os.id, {
+        status: 'CONCLUIDA',
+        status_sincronizacao: 'pendente',
+        sync_status: 'pendente',
+        sincronizado: false,
+        requer_verificacao: requerVerificacao,
+        fotos_recolhimento: arrayFotosBlobs,
+        fotos_por_equipamento: fotos,
+        concluido_em: new Date().toISOString()
+      });
+
+      // Fecha o modal instantaneamente (otimista)
       onClose();
+
+      // Disparo imediato em background sem travar a interface
+      sincronizarPendentes().catch((err) => console.warn('Erro sync automático em background:', err));
     } catch (err) {
       console.error('Erro ao finalizar O.S.:', err);
       alert('Falha ao salvar conclusão da O.S.');
@@ -147,6 +264,7 @@ export default function ModalDetalhesOS({ os, onClose }) {
     }
   };
 
+  // Encerramento Improdutivo: Limpeza completa de fotos, requer_verificacao = false e sync imediato
   const handleRegistrarImprodutiva = async (e) => {
     e.preventDefault();
     if (motivoImprodutiva === 'Outro' && !obsTecnico.trim()) {
@@ -155,15 +273,40 @@ export default function ModalDetalhesOS({ os, onClose }) {
     }
 
     try {
+      setSalvando(true);
+
       await db.ordens_servico.update(os.id, {
         status: 'IMPRODUTIVA',
+        status_sincronizacao: 'pendente',
+        sync_status: 'pendente',
+        sincronizado: false,
+        requer_verificacao: false,
+        fotos_recolhimento: null,
+        fotos_por_equipamento: null,
         motivo_improdutiva: motivoImprodutiva,
         observacao_tecnico: obsTecnico.trim(),
-        data_finalizacao: new Date().toISOString()
+        concluido_em: new Date().toISOString()
       });
+
+      // Reverte status de equipamentos previstos
+      if (equipamentosPrevistos.length > 0) {
+        for (const eq of equipamentosPrevistos) {
+          if (eq.id !== undefined && eq.id !== null) {
+            await db.equipamentos.update(eq.id, { foi_recolhido: false });
+          }
+        }
+      }
+
+      // Fecha o modal instantaneamente
       onClose();
+
+      // Disparo imediato em background sem travar a interface
+      sincronizarPendentes().catch((err) => console.warn('Erro sync automático em background:', err));
     } catch (err) {
       console.error('Erro ao registrar improdutiva:', err);
+      alert('Falha ao registrar improdutiva.');
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -278,7 +421,74 @@ export default function ModalDetalhesOS({ os, onClose }) {
             )}
           </div>
 
-          {/* Destaque de Observações da OS: Posicionado logo acima dos botões de ação */}
+          {/* Bloco Visual de Conferência de MACs Recomendados (quando fora do fluxo de finalização) */}
+          {fluxoAtivo !== 'SUCESSO' && (
+            <div className="bg-blue-50/90 border-2 border-blue-300 p-3.5 rounded-xl space-y-2.5 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-xs">
+                    <Router className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-blue-950 uppercase tracking-wider block">
+                      Aparelhos / MACs Recomendados
+                    </span>
+                    <span className="text-[11px] text-blue-700 font-medium">
+                      Conferir na etiqueta do equipamento antes de recolher
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-xs font-extrabold bg-blue-100 text-blue-900 border border-blue-300">
+                  {equipamentosPrevistos.length} {equipamentosPrevistos.length === 1 ? 'item' : 'itens'}
+                </span>
+              </div>
+
+              {equipamentosPrevistos.length > 0 ? (
+                <div className="space-y-1.5 pt-1">
+                  {equipamentosPrevistos.map((eq, idx) => {
+                    const mac = eq.mac_esperado || 'MAC não informado';
+                    const jaRecolhido = eq.foi_recolhido;
+                    return (
+                      <div
+                        key={eq.id || idx}
+                        className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-blue-200 shadow-2xs"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                            {idx + 1}
+                          </span>
+                          <span className="font-mono text-sm font-bold text-slate-900 tracking-wider truncate">
+                            {mac}
+                          </span>
+                        </div>
+                        {jaRecolhido ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded flex-shrink-0">
+                            <CheckCircle className="w-3 h-3 text-emerald-600" />
+                            Recolhido
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded flex-shrink-0">
+                            A Recolher
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-2.5 bg-white/80 rounded-lg border border-dashed border-blue-300 text-center">
+                  <p className="text-xs font-medium text-slate-600">
+                    Nenhum MAC específico cadastrado para esta O.S.
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Recolha os aparelhos da operadora presentes no local.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Destaque de Observações da OS */}
           {obsCliente && (
             <div className="bg-yellow-50 border-l-4 border-yellow-500 text-yellow-900 p-3 rounded-r-xl shadow-xs">
               <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider mb-1 text-yellow-800">
@@ -291,115 +501,171 @@ export default function ModalDetalhesOS({ os, onClose }) {
             </div>
           )}
 
-          {/* Formulário Condicional: Finalizar OS (Sucesso) */}
+          {/* Formulário Condicional: Finalizar OS (Sucesso) - Encerramento Flexível com Fotos por MAC */}
           {fluxoAtivo === 'SUCESSO' && (
-            <form onSubmit={handleSalvarConclusao} className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 space-y-4 animate-in fade-in">
+            <form onSubmit={handleSalvarConclusao} className="p-4 bg-emerald-50/90 rounded-2xl border-2 border-emerald-300 space-y-4 animate-in fade-in">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-emerald-950 flex items-center gap-1.5">
                   <CheckCircle className="w-4 h-4 text-action-success" />
-                  Finalização de Recolhimento
+                  Equipamentos Recolhidos & Fotos
                 </h3>
                 <span className="text-xs font-semibold px-2 py-0.5 rounded bg-white text-slate-700 border border-emerald-200">
-                  Previstos: {equipamentosPrevistos.length}
+                  {totalFotosAnexadas} foto(s) anexada(s)
                 </span>
               </div>
 
-              {/* Status Informativo da Triagem (Malha Fina) */}
-              <div className="p-2.5 bg-white rounded-lg border border-emerald-200 text-xs">
-                {equipamentosPrevistos.length === 1 && fotos.length === 1 ? (
-                  <span className="text-emerald-700 font-bold flex items-center gap-1">
-                    ✓ Triagem Automática (1 previsto, 1 foto)
-                  </span>
-                ) : fotos.length > 0 ? (
-                  <span className="text-amber-700 font-bold flex items-center gap-1">
-                    ℹ Requer Auditoria do Admin ({equipamentosPrevistos.length} previstos, {fotos.length} fotos)
-                  </span>
+              {/* Status Dinâmico de Triagem e Auditoria */}
+              <div className="p-2.5 bg-white rounded-xl border border-emerald-200 text-xs">
+                {requerVerificacao ? (
+                  <div className="flex items-center gap-1.5 text-amber-800 font-bold">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                    <span>
+                      Requer Auditoria: {macsComFotoQtd} de {macsRecomendadosQtd} MACs recomendados recolhidos com foto.
+                    </span>
+                  </div>
+                ) : totalFotosAnexadas > 0 ? (
+                  <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span>
+                      Triagem Automática: {totalFotosAnexadas} aparelho(s) pronto(s) para conclusão.
+                    </span>
+                  </div>
                 ) : (
-                  <span className="text-slate-500 font-medium">
-                    Tire ao menos 1 foto dos aparelhos recolhidos para salvar.
+                  <span className="text-slate-600 font-medium">
+                    Tire ao menos 1 foto do equipamento recolhido para liberar a conclusão.
                   </span>
                 )}
               </div>
 
-              {/* Botão de Câmera / Anexar Fotos */}
-              <div>
-                <label className="w-full flex items-center justify-center gap-2 px-3 py-3 bg-white border-2 border-dashed border-emerald-400 rounded-xl cursor-pointer text-emerald-800 text-xs font-bold hover:bg-emerald-100/50 active:scale-98 transition-all shadow-xs">
-                  {comprimindo ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-emerald-700" />
-                      <span>Comprimindo foto...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="w-4 h-4 text-emerald-700" />
-                      <span>{fotos.length === 0 ? 'Tirar Foto do Aparelho (Câmera)' : 'Adicionar Mais Fotos'}</span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    disabled={comprimindo}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFotoChange(file);
-                      e.target.value = '';
-                    }}
-                    className="hidden"
-                  />
-                </label>
-              </div>
+              {/* Lista de Seleção de Equipamentos com Câmera Individual e Preview Thumbnail */}
+              <div className="space-y-2.5">
+                <span className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Selecione e fotografe o que foi recolhido:
+                </span>
 
-              {/* Passo 2: Preview da Imagem com URL.createObjectURL(fotoBlob) */}
-              {fotos.length > 0 && (
-                <div className="space-y-2">
-                  <span className="block text-xs font-bold text-slate-700">
-                    Fotos Anexadas ({fotos.length})
-                  </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    {fotos.map((fotoBlob, index) => (
-                      <div 
-                        key={index} 
-                        className="relative p-2 bg-white rounded-lg border border-slate-200 flex flex-col items-center gap-1.5 shadow-xs"
-                      >
-                        <img 
-                          src={URL.createObjectURL(fotoBlob)} 
-                          alt={`Preview Foto ${index + 1}`} 
-                          className="w-full h-24 rounded object-cover border border-slate-200"
-                        />
-                        <div className="w-full flex items-center justify-between text-[11px] font-semibold text-slate-600 px-1">
-                          <span>Foto {index + 1}</span>
+                {listaRecolhimento.map((eq, idx) => {
+                  const eqKey = eq.id !== undefined && eq.id !== null ? String(eq.id) : (eq.key || eq.mac_esperado || `eq-${idx}`);
+                  const mac = eq.mac_esperado || 'Aparelho';
+                  const temFoto = Boolean(fotos[eqKey]);
+                  const isComprimindoEste = comprimindoKey === eqKey;
+
+                  return (
+                    <div
+                      key={eqKey}
+                      className={`p-3 rounded-xl border transition-all ${
+                        temFoto 
+                          ? 'bg-white border-emerald-400 shadow-xs ring-1 ring-emerald-300' 
+                          : 'bg-white/90 border-slate-200 shadow-2xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <span className={`w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 ${
+                            temFoto ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <div className="overflow-hidden">
+                            <span className="font-mono text-xs font-bold text-slate-900 block truncate">
+                              {mac}
+                            </span>
+                            <span className={`text-[10px] font-semibold ${temFoto ? 'text-emerald-700' : 'text-slate-400'}`}>
+                              {temFoto ? '✓ Recolhido (com foto)' : 'Pendente de recolhimento'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Botão de Câmera individual para este equipamento */}
+                        <label className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex-shrink-0 shadow-2xs ${
+                          temFoto
+                            ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200 border border-emerald-300'
+                            : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
+                        }`}>
+                          {isComprimindoEste ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Processando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="w-3.5 h-3.5" />
+                              <span>{temFoto ? 'Trocar Foto' : 'Tirar Foto'}</span>
+                            </>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            disabled={comprimindoKey !== null || salvando}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFotoEquipamento(eqKey, file);
+                              e.target.value = '';
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      {/* Preview Visual da Thumbnail abaixo do equipamento */}
+                      {temFoto && (
+                        <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 overflow-hidden">
+                            <img
+                            src={previewUrls[eqKey] || ''}
+                              alt={`Thumbnail do ${mac}`}
+                              className="w-16 h-16 object-cover rounded-lg border border-emerald-200 shadow-2xs flex-shrink-0"
+                            />
+                            <div className="text-xs">
+                              <span className="font-bold text-emerald-950 block">Thumbnail vinculada</span>
+                              <span className="text-[11px] text-slate-500 font-mono">
+                                {(fotos[eqKey].size / 1024).toFixed(0)} KB • Salva local
+                              </span>
+                            </div>
+                          </div>
                           <button
                             type="button"
-                            onClick={() => handleRemoverFoto(index)}
-                            className="p-1 text-red-500 hover:text-red-700 rounded hover:bg-red-50 transition-colors"
-                            title="Remover foto"
+                            onClick={() => handleRemoverFotoEquipamento(eqKey)}
+                            disabled={salvando}
+                            className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                            title="Remover foto deste equipamento"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Botão para adicionar equipamento extra não listado na O.S. */}
+                <button
+                  type="button"
+                  onClick={handleAdicionarAparelhoExtra}
+                  className="w-full py-2 px-3 border border-dashed border-emerald-400 bg-white/70 hover:bg-emerald-50 text-emerald-800 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Adicionar Aparelho Extra Recolhido</span>
+                </button>
+              </div>
 
               {/* Botões de Ação do Formulário de Sucesso */}
               <div className="flex gap-2 pt-2">
                 <button
                   type="submit"
-                  disabled={fotos.length === 0 || comprimindo || salvando}
+                  disabled={!podeConcluir}
                   className={`flex-1 py-3 px-4 text-white font-bold text-sm rounded-xl shadow transition-all ${
-                    fotos.length > 0 && !comprimindo && !salvando
+                    podeConcluir
                       ? 'bg-action-success hover:opacity-95 active:scale-98 cursor-pointer' 
                       : 'bg-slate-300 cursor-not-allowed opacity-70'
                   }`}
                 >
-                  {salvando ? 'Salvando...' : fotos.length === 0 ? 'Anexe ao menos 1 foto para salvar' : 'Salvar Conclusão'}
+                  {salvando ? 'Salvando...' : totalFotosAnexadas === 0 ? 'Anexe ao menos 1 foto para concluir' : 'Concluir O.S.'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setFluxoAtivo(null)}
+                  disabled={salvando}
                   className="py-3 px-4 bg-slate-200 text-slate-700 font-semibold text-sm rounded-xl hover:bg-slate-300 transition-colors"
                 >
                   Cancelar
@@ -408,7 +674,7 @@ export default function ModalDetalhesOS({ os, onClose }) {
             </form>
           )}
 
-          {/* Formulário Condicional: Visita Improdutiva (Falha) */}
+          {/* Formulário Condicional: Visita Improdutiva (Falha) - SEM Seção de Upload e com Limpeza */}
           {fluxoAtivo === 'IMPRODUTIVA' && (
             <form onSubmit={handleRegistrarImprodutiva} className="p-4 bg-red-50 rounded-xl border border-red-200 space-y-3 animate-in fade-in">
               <h3 className="text-sm font-bold text-red-950 flex items-center gap-1.5">
@@ -449,13 +715,15 @@ export default function ModalDetalhesOS({ os, onClose }) {
               <div className="flex gap-2 pt-2">
                 <button
                   type="submit"
+                  disabled={salvando}
                   className="flex-1 py-3 px-4 bg-action-danger text-white font-bold text-sm rounded-xl shadow hover:opacity-95 active:scale-98 transition-all"
                 >
-                  Registrar Falha
+                  {salvando ? 'Registrando...' : 'Registrar Falha'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setFluxoAtivo(null)}
+                  disabled={salvando}
                   className="py-3 px-4 bg-slate-200 text-slate-700 font-semibold text-sm rounded-xl hover:bg-slate-300 transition-colors"
                 >
                   Cancelar
@@ -481,7 +749,7 @@ export default function ModalDetalhesOS({ os, onClose }) {
                     )}
                     {os.status === 'CONCLUIDA' ? 'O.S. Concluída' : 'Visita Improdutiva'}
                   </span>
-                  {os.sincronizado ? (
+                  {os.sincronizado || os.status_sincronizacao === 'sincronizado' ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
                       <Cloud className="w-3 h-3 text-blue-600" />
                       Enviado para a nuvem
@@ -507,14 +775,14 @@ export default function ModalDetalhesOS({ os, onClose }) {
               </div>
 
               {/* Miniaturas de fotos anexadas ou URLs públicas da nuvem */}
-              {((os.fotos_urls && os.fotos_urls.length > 0) || (os.fotos_recolhimento && os.fotos_recolhimento.length > 0)) && (
+              {Array.isArray(os.fotos_recolhimento) && os.fotos_recolhimento.length > 0 && (
                 <div className="space-y-1.5">
                   <span className="text-xs font-bold text-slate-700">Fotos Registradas</span>
                   <div className="grid grid-cols-2 gap-2">
-                    {(os.fotos_urls || os.fotos_recolhimento).map((foto, idx) => {
+                    {os.fotos_recolhimento.map((foto, idx) => {
                       const src = typeof foto === 'string' 
                         ? foto 
-                        : (foto instanceof Blob ? URL.createObjectURL(foto) : '');
+                        : (foto instanceof Blob ? (previewUrls[`concluida-${idx}`] || '') : '');
                       if (!src) return null;
                       return (
                         <img
@@ -538,7 +806,7 @@ export default function ModalDetalhesOS({ os, onClose }) {
             <button
               type="button"
               onClick={() => setFluxoAtivo('SUCESSO')}
-              className="w-full py-3.5 px-4 bg-action-success text-white font-bold text-base rounded-xl shadow-md hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              className="w-full py-3.5 px-4 bg-action-success text-white font-bold text-base rounded-xl shadow-md hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <CheckCircle className="w-5 h-5" />
               <span>Finalizar O.S.</span>
@@ -546,8 +814,11 @@ export default function ModalDetalhesOS({ os, onClose }) {
 
             <button
               type="button"
-              onClick={() => setFluxoAtivo('IMPRODUTIVA')}
-              className="w-full py-3.5 px-4 bg-action-danger text-white font-bold text-base rounded-xl shadow-md hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              onClick={() => {
+                setFotos({}); // Limpeza imediata em improdutiva
+                setFluxoAtivo('IMPRODUTIVA');
+              }}
+              className="w-full py-3.5 px-4 bg-action-danger text-white font-bold text-base rounded-xl shadow-md hover:opacity-95 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <XCircle className="w-5 h-5" />
               <span>Visita Improdutiva</span>

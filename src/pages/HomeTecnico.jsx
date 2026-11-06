@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/db';
+import { sincronizarPendentes } from '../services/syncService';
 import Header from '../components/Header';
 import CardOS from '../components/CardOS';
 import ModalDetalhesOS from '../components/ModalDetalhesOS';
@@ -8,14 +9,71 @@ import { Database, CheckCircle2, Clock } from 'lucide-react';
 
 export default function HomeTecnico() {
   const [abaAtiva, setAbaAtiva] = useState('PENDENTES'); // 'PENDENTES' | 'CONCLUIDAS'
-  const [osSelecionada, setOsSelecionada] = useState(null);
+  const [osSelecionadaId, setOsSelecionadaId] = useState(() => {
+    return sessionStorage.getItem('os_selecionada_id') || null;
+  });
+
+  // Escutadores nativos de sincronização automática orientada a eventos (sem setInterval)
+  useEffect(() => {
+    const handleOnline = () => {
+      sincronizarPendentes().catch((err) => console.warn('Erro sync automático (online):', err));
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        sincronizarPendentes().catch((err) => console.warn('Erro sync automático (visibility):', err));
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    if (navigator.onLine) {
+      sincronizarPendentes().catch((err) => console.warn('Erro sync automático (inicial):', err));
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   // Lê direto do Dexie (IndexedDB) ordenado por ordem_importacao.
   // useLiveQuery é reativo ao banco local — não dispara fetch de rede
-  // e não recarrega ao trocar de aba / voltar do WhatsApp / Maps.
+  // e não possui listeners de focus/visibilitychange que recarreguem a lista
+  // ao retornar do app de câmera, Maps ou WhatsApp.
   const ordens = useLiveQuery(async () => {
     return await db.ordens_servico.orderBy('ordem_importacao').toArray();
   }, []);
+
+  // Mantém a OS selecionada sincronizada com o Dexie e persistente contra reciclagens de RAM
+  const osSelecionada = useLiveQuery(async () => {
+    if (!osSelecionadaId) return null;
+    const porId = await db.ordens_servico.get(
+      isNaN(Number(osSelecionadaId)) ? osSelecionadaId : Number(osSelecionadaId)
+    );
+    if (porId) return porId;
+    return await db.ordens_servico.where({ numero_os: osSelecionadaId }).first();
+  }, [osSelecionadaId]);
+
+  const handleSelecionarOS = (os) => {
+    const idIdentificador = os.id || os.numero_os;
+    setOsSelecionadaId(idIdentificador);
+    try {
+      sessionStorage.setItem('os_selecionada_id', String(idIdentificador));
+    } catch (e) {
+      console.warn('Aviso ao persistir os_selecionada_id:', e);
+    }
+  };
+
+  const handleFecharModal = () => {
+    setOsSelecionadaId(null);
+    try {
+      sessionStorage.removeItem('os_selecionada_id');
+    } catch (e) {
+      console.warn('Aviso ao remover os_selecionada_id:', e);
+    }
+  };
 
   const ordensFiltradas = (ordens || []).filter((os) => {
     if (abaAtiva === 'PENDENTES') {
@@ -81,7 +139,7 @@ export default function HomeTecnico() {
               <CardOS
                 key={os.id || os.numero_os}
                 os={os}
-                onClick={() => setOsSelecionada(os)}
+                onClick={() => handleSelecionarOS(os)}
               />
             ))
           )}
@@ -92,7 +150,7 @@ export default function HomeTecnico() {
       {osSelecionada && (
         <ModalDetalhesOS
           os={osSelecionada}
-          onClose={() => setOsSelecionada(null)}
+          onClose={handleFecharModal}
         />
       )}
     </div>

@@ -125,7 +125,7 @@ export default function ImportarPlanilha() {
           let ordensCriadas = 0;
           let ordensRemarcadas = 0;
           let ordensExistentes = 0;
-          let equipamentosInseridos = 0;
+          let  equipamentosInseridos = 0;
           const mapaOsIds = new Map();       // numero_os -> uuid
           const osProcessadas = new Set();   // deduplicação intra-lote
 
@@ -292,12 +292,12 @@ export default function ImportarPlanilha() {
                 }
               }
 
-              // Processa MACs — verifica duplicata antes de inserir
+              // Processa MACs — split por vírgula, barra, pipe ou quebra de linha; insere registro filho na tabela equipamentos
               if (osId) {
-                const macsRaw = linha.mac_aparelho ? String(linha.mac_aparelho) : null;
+                const macsRaw = getVal(linha, ['mac_aparelho', 'mac', 'macs', 'aparelho']);
 
                 if (macsRaw) {
-                  const listaMacs = macsRaw.split(',').map((m) => m.trim()).filter(Boolean);
+                  const listaMacs = macsRaw.split(/[,/|\n\r]+/).map((m) => m.trim()).filter(Boolean);
 
                   for (const mac of listaMacs) {
                     const { data: macExistente } = await supabase
@@ -310,7 +310,12 @@ export default function ImportarPlanilha() {
                     if (!macExistente) {
                       const { error: erroMac } = await supabase
                         .from('equipamentos')
-                        .insert([{ os_id: osId, mac_esperado: mac, recolhido: false }]);
+                        .insert([{ 
+                          os_id: osId, 
+                          mac_esperado: mac, 
+                          foi_recolhido: false, 
+                          foto_url: null 
+                        }]);
 
                       if (!erroMac) {
                         equipamentosInseridos++;
@@ -443,7 +448,7 @@ export default function ImportarPlanilha() {
               </div>
             ) : tecnicos.length === 0 ? (
               <div className="px-3 py-2.5 rounded-xl border border-amber-200 bg-amber-50 text-xs font-semibold text-amber-700">
-                ⚠️ Nenhum técnico cadastrado com perfil TECNICO e ativo.
+                ⚠️ Nenhum técnico cadastrado com role TECNICO e ativo.
               </div>
             ) : (
               <select

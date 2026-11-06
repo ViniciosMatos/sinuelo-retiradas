@@ -18,7 +18,7 @@ export default function CardOS({ os, onClick }) {
   if (!os) return null;
 
   const temHorarioMarcado = Boolean(os.horario_marcado && os.horario_marcado.trim() !== '');
-  const obsCliente = os.observacao_cliente || os.obs_cliente;
+  const obsCliente = os.observacao_cliente;
   const temObservacao = Boolean(obsCliente && obsCliente.trim() !== '');
   const isPendente = !os.status || os.status === 'PENDENTE';
   const isSincronizado = Boolean(os.sincronizado);
@@ -30,14 +30,13 @@ export default function CardOS({ os, onClick }) {
       await db.ordens_servico.update(os.id, {
         status: 'PENDENTE',
         fotos_recolhimento: null,
-        fotos: null,
-        fotos_urls: null,
+        fotos_por_equipamento: null,
         requer_verificacao: null,
         motivo_improdutiva: null,
         observacao_tecnico: null,
-        data_finalizacao: null,
+        concluido_em: null,
         sincronizado: false,
-        sync_status: null,
+        status_sincronizacao: null,
       });
 
       // Reverte status de equipamentos previstos
@@ -47,7 +46,7 @@ export default function CardOS({ os, onClick }) {
         previstos = await db.equipamentos.where({ os_id: Number(os_id) }).toArray();
       }
       for (const eq of (previstos || [])) {
-        await db.equipamentos.update(eq.id, { foi_recolhido: false, recolhido: false });
+        await db.equipamentos.update(eq.id, { foi_recolhido: false });
       }
     } catch (err) {
       console.error('Erro ao desfazer O.S.:', err);

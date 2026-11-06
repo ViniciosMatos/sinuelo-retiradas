@@ -302,13 +302,7 @@ function CardOSAdmin({ os, tecnicos, onEditar }) {
 
         {/* Rodapé com botão Editar */}
         <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            {os.sincronizado && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                <Cloud className="w-3 h-3" /> Sincronizado
-              </span>
-            )}
-          </div>
+          <div className="flex items-center gap-1.5" />
           <button
             type="button"
             onClick={() => onEditar(os)}
@@ -339,7 +333,7 @@ export default function AdminAgenda() {
       const { data } = await supabase
         .from('usuarios')
         .select('id, nome, email')
-        .eq('perfil', 'TECNICO')
+        .eq('role', 'TECNICO')
         .order('nome');
       if (data) setTecnicos(data);
     }
