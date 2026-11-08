@@ -69,3 +69,5 @@ coverage
 # Local Agent & AI caches
 .gemini/
 .claude/
+
+PROJECT_STATUS.md

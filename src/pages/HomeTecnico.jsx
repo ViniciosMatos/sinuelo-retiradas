@@ -67,12 +67,15 @@ export default function HomeTecnico() {
   };
 
   const handleFecharModal = () => {
-    setOsSelecionadaId(null);
     try {
+      if (osSelecionadaId) {
+        sessionStorage.removeItem(`modal_aba_ativa_${osSelecionadaId}`);
+      }
       sessionStorage.removeItem('os_selecionada_id');
     } catch (e) {
       console.warn('Aviso ao remover os_selecionada_id:', e);
     }
+    setOsSelecionadaId(null);
   };
 
   const ordensFiltradas = (ordens || []).filter((os) => {

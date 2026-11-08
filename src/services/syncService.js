@@ -199,7 +199,8 @@ export async function sincronizarPendentes() {
 
       // 2. Upload de cada foto (Blob/File) para o storage do Supabase
       for (let i = 0; i < fotos.length; i++) {
-        const fotoItem = fotos[i];
+        const rawItem = fotos[i];
+        const fotoItem = (rawItem instanceof Blob) ? rawItem : (rawItem?.file || rawItem?.blob || rawItem);
 
         if (fotoItem instanceof Blob) {
           const extensao = fotoItem.type === 'image/png' ? 'png' : 'jpg';
@@ -257,7 +258,7 @@ export async function sincronizarPendentes() {
         throw updateError;
       }
 
-      // 5. Sincroniza equipamentos recolhidos: upload da foto individual + atualiza foto_url no Supabase
+      // 5. Sincroniza equipamentos: upload da foto para recolhidos e foto_url=null para não entregues
       try {
         const fotosPorEquip = (tarefa.fotos_por_equipamento && typeof tarefa.fotos_por_equipamento === 'object')
           ? tarefa.fotos_por_equipamento
@@ -266,30 +267,37 @@ export async function sincronizarPendentes() {
         const equipLocais = await db.equipamentos.where({ os_id: tarefa.id }).toArray();
 
         for (const eq of equipLocais) {
-          if (!(eq.foi_recolhido || eq.recolhido)) continue;
+          if (eq.foi_recolhido) {
+            let fotoUrl = null;
+            const item = fotosPorEquip[String(eq.id)];
+            const blob = (item instanceof Blob) ? item : (item?.file || item?.blob);
 
-          let fotoUrl = null;
-          const blob = fotosPorEquip[String(eq.id)];
+            if (blob instanceof Blob) {
+              const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+              const nome = `${tarefa.numero_os}_${eq.id}.${ext}`;
+              const { error: upErr } = await supabase.storage
+                .from('fotos-os')
+                .upload(nome, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
 
-          if (blob instanceof Blob) {
-            const ext = blob.type === 'image/png' ? 'png' : 'jpg';
-            const nome = `${tarefa.numero_os}_${eq.id}.${ext}`;
-            const { error: upErr } = await supabase.storage
-              .from('fotos-os')
-              .upload(nome, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
-
-            if (!upErr) {
-              const { data: urlData } = supabase.storage.from('fotos-os').getPublicUrl(nome);
-              fotoUrl = urlData?.publicUrl || null;
-            } else {
-              console.warn(`Falha upload foto equipamento ${eq.id}:`, upErr);
+              if (!upErr) {
+                const { data: urlData } = supabase.storage.from('fotos-os').getPublicUrl(nome);
+                fotoUrl = urlData?.publicUrl || null;
+              } else {
+                console.warn(`Falha upload foto equipamento ${eq.id}:`, upErr);
+              }
             }
-          }
 
-          await supabase
-            .from('equipamentos')
-            .update({ foi_recolhido: true, ...(fotoUrl ? { foto_url: fotoUrl } : {}) })
-            .eq('id', eq.id);
+            await supabase
+              .from('equipamentos')
+              .update({ foi_recolhido: true, ...(fotoUrl ? { foto_url: fotoUrl } : {}) })
+              .eq('id', eq.id);
+          } else {
+            // Equipamento não entregue / não recolhido
+            await supabase
+              .from('equipamentos')
+              .update({ foi_recolhido: false, foto_url: null })
+              .eq('id', eq.id);
+          }
         }
       } catch (eqSyncErr) {
         console.warn('Aviso ao sincronizar equipamentos:', eqSyncErr);
