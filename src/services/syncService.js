@@ -185,63 +185,16 @@ export async function sincronizarPendentes() {
     let sincronizadasComSucesso = 0;
 
     for (const tarefa of tarefasPendentesSync) {
-      const urlsFotos = [];
-
-      // Extrai fotos de array ou do objeto indexado por equipamento
-      let fotos = [];
-      if (Array.isArray(tarefa.fotos_recolhimento)) {
-        fotos = tarefa.fotos_recolhimento;
-      } else if (tarefa.fotos_por_equipamento && typeof tarefa.fotos_por_equipamento === 'object') {
-        fotos = Object.values(tarefa.fotos_por_equipamento).filter(Boolean);
-      } else if (Array.isArray(tarefa.fotos)) {
-        fotos = tarefa.fotos;
-      }
-
-      // 2. Upload de cada foto (Blob/File) para o storage do Supabase
-      for (let i = 0; i < fotos.length; i++) {
-        const rawItem = fotos[i];
-        const fotoItem = (rawItem instanceof Blob) ? rawItem : (rawItem?.file || rawItem?.blob || rawItem);
-
-        if (fotoItem instanceof Blob) {
-          const extensao = fotoItem.type === 'image/png' ? 'png' : 'jpg';
-          const nomeArquivo = `${tarefa.id || tarefa.numero_os}_${Date.now()}_${i}.${extensao}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('fotos-os')
-            .upload(nomeArquivo, fotoItem, {
-              contentType: fotoItem.type || 'image/jpeg',
-              upsert: true,
-            });
-
-          if (uploadError) {
-            console.error(`Falha no upload da foto ${i} da OS ${tarefa.numero_os}:`, uploadError);
-            throw uploadError;
-          }
-
-          // Recupera a URL pública gerada
-          const { data: urlData } = supabase.storage
-            .from('fotos-os')
-            .getPublicUrl(nomeArquivo);
-
-          if (urlData?.publicUrl) {
-            urlsFotos.push(urlData.publicUrl);
-          }
-        } else if (typeof fotoItem === 'string' && fotoItem.startsWith('http')) {
-          urlsFotos.push(fotoItem);
-        }
-      }
-
-      // 3. Monta objeto de atualização — apenas colunas que existem no banco
+      // 2. Monta objeto de atualização — apenas colunas reais no banco (sem fotos_recolhimento)
       const payload = {
         status: tarefa.status,
         observacao_tecnico: tarefa.observacao_tecnico || null,
         motivo_improdutiva: tarefa.motivo_improdutiva || null,
         requer_verificacao: Boolean(tarefa.requer_verificacao),
-        fotos_recolhimento: urlsFotos.length > 0 ? urlsFotos : null,
         concluido_em: tarefa.status !== 'PENDENTE' ? new Date().toISOString() : null,
       };
 
-      // 4. Update na tabela ordens_servico do Supabase
+      // 3. Update na tabela ordens_servico do Supabase
       let query = supabase.from('ordens_servico').update(payload);
       if (tarefa.id && isNaN(Number(tarefa.id))) {
         query = query.eq('id', tarefa.id);
@@ -258,7 +211,7 @@ export async function sincronizarPendentes() {
         throw updateError;
       }
 
-      // 5. Sincroniza equipamentos: upload da foto para recolhidos e foto_url=null para não entregues
+      // 4. Sincroniza equipamentos (único envio de fotos, sem duplicidade)
       try {
         const fotosPorEquip = (tarefa.fotos_por_equipamento && typeof tarefa.fotos_por_equipamento === 'object')
           ? tarefa.fotos_por_equipamento
@@ -269,12 +222,13 @@ export async function sincronizarPendentes() {
         for (const eq of equipLocais) {
           if (eq.foi_recolhido) {
             let fotoUrl = null;
-            const item = fotosPorEquip[String(eq.id)];
+            // Busca pelo ID ou pela chave temporária (equipamentos extras)
+            const item = fotosPorEquip[String(eq.id)] || (eq.temp_key ? fotosPorEquip[eq.temp_key] : null);
             const blob = (item instanceof Blob) ? item : (item?.file || item?.blob);
 
             if (blob instanceof Blob) {
               const ext = blob.type === 'image/png' ? 'png' : 'jpg';
-              const nome = `${tarefa.numero_os}_${eq.id}.${ext}`;
+              const nome = `${tarefa.numero_os}_${eq.is_extra ? `extra_${Date.now()}` : eq.id}.${ext}`;
               const { error: upErr } = await supabase.storage
                 .from('fotos-os')
                 .upload(nome, blob, { contentType: blob.type || 'image/jpeg', upsert: true });
@@ -285,12 +239,35 @@ export async function sincronizarPendentes() {
               } else {
                 console.warn(`Falha upload foto equipamento ${eq.id}:`, upErr);
               }
+            } else if (typeof item === 'string' && item.startsWith('http')) {
+              fotoUrl = item;
             }
 
-            await supabase
-              .from('equipamentos')
-              .update({ foi_recolhido: true, ...(fotoUrl ? { foto_url: fotoUrl } : {}) })
-              .eq('id', eq.id);
+            // Opção 1: Equipamentos extras recebem INSERT com MAC "EXTRA" conectando à OS
+            if (eq.is_extra || eq.mac_esperado === 'EXTRA') {
+              const { data: insData, error: insErr } = await supabase
+                .from('equipamentos')
+                .insert([{
+                  os_id: tarefa.id,
+                  mac_esperado: 'EXTRA',
+                  foi_recolhido: true,
+                  foto_url: fotoUrl,
+                }])
+                .select()
+                .single();
+
+              if (!insErr && insData?.id) {
+                await db.equipamentos.update(eq.id, { id: insData.id, foto_url: fotoUrl });
+              } else if (insErr) {
+                console.warn('Erro ao inserir equipamento extra no Supabase:', insErr);
+              }
+            } else {
+              // Equipamento padrão existente na OS
+              await supabase
+                .from('equipamentos')
+                .update({ foi_recolhido: true, ...(fotoUrl ? { foto_url: fotoUrl } : {}) })
+                .eq('id', eq.id);
+            }
           } else {
             // Equipamento não entregue / não recolhido
             await supabase
@@ -303,12 +280,11 @@ export async function sincronizarPendentes() {
         console.warn('Aviso ao sincronizar equipamentos:', eqSyncErr);
       }
 
-      // 6. Atualiza registro no Dexie marcando status_sincronizacao = 'sincronizado' e substitui Blobs por URLs públicas
+      // 5. Atualiza registro no Dexie marcando status_sincronizacao = 'sincronizado'
       await db.ordens_servico.update(tarefa.id, {
         status_sincronizacao: 'sincronizado',
         sync_status: 'synced',
         sincronizado: true,
-        fotos_recolhimento: urlsFotos.length > 0 ? urlsFotos : null, // Guarda URLs da nuvem no campo fotos_recolhimento
         fotos_por_equipamento: null,
       });
 

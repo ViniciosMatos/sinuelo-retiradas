@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabase';
 import ImportarPlanilha from './ImportarPlanilha';
 import AdminAgenda from './AdminAgenda';
+import AdminExportar from './AdminExportar';
 import { 
   getTodayBR, 
   getCurrentMonthBR, 
@@ -681,15 +682,7 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
             <ImportarPlanilha />
           )}
 
-          {paginaAtiva === 'EXPORTAR' && (
-            <div className="bg-white p-8 rounded-2xl shadow-xs border border-slate-200 text-center space-y-3">
-              <FileDown className="w-12 h-12 text-slate-400 mx-auto" />
-              <h2 className="text-lg font-bold text-slate-800">Módulo de Exportação de Relatórios (CSV)</h2>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-                Em breve: gere relatórios desmembrados por MAC recolhido e status de visitas para integração com o faturamento.
-              </p>
-            </div>
-          )}
+          {paginaAtiva === 'EXPORTAR' && <AdminExportar />}
         </div>
       </main>
     </div>

@@ -405,6 +405,21 @@ export default function ModalDetalhesOS({ os, onClose }) {
         }
       }
 
+      // Persistência dos equipamentos extras no Dexie (Opção 1)
+      for (const extra of aparelhosExtras) {
+        const k = extra.key;
+        const temFoto = Boolean(fotos[k]?.previewUrl || fotos[k]?.file || fotos[k]?.blob);
+        if (temFoto) {
+          await db.equipamentos.add({
+            os_id: os.id,
+            mac_esperado: 'EXTRA',
+            foi_recolhido: true,
+            is_extra: true,
+            temp_key: k,
+          });
+        }
+      }
+
       const arrayFotosBlobs = Object.values(fotos)
         .map((item) => (item instanceof Blob ? item : (item?.file || item?.blob)))
         .filter((f) => f instanceof Blob);
