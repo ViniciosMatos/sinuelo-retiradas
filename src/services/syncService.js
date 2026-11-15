@@ -1,8 +1,10 @@
 import { supabase } from '../supabase';
 import { db } from '../db/db';
+import { getTodayBR } from '../utils/dateUtils';
 
 /**
  * Passo 1 - A) Baixa O.S. com status 'PENDENTE' do Supabase com Merge Inteligente no Dexie.js:
+ * - Filtra estritamente pela data do dia atual (data_agendada = hoje em America/Sao_Paulo).
  * - Identifica O.S. locais pendentes de envio (sync_status === 'pendente', fotos/improdutivas locais).
  * - NUNCA sobrescreve nem apaga O.S. locais pendentes de sincronização.
  * - Adiciona novas O.S. não presentes no dispositivo.
@@ -13,11 +15,14 @@ export async function baixarCargaDoDia() {
     throw new Error('Sem conexão com a internet para baixar tarefas.');
   }
 
-  // 1. Busca ordens de serviço pendentes no Supabase, trazendo equipamentos relacionais
+  const hoje = getTodayBR();
+
+  // 1. Busca ordens de serviço pendentes no Supabase da data de hoje, trazendo equipamentos relacionais
   const { data: ordens, error } = await supabase
     .from('ordens_servico')
     .select('*, equipamentos(*)')
-    .eq('status', 'PENDENTE');
+    .eq('status', 'PENDENTE')
+    .eq('data_agendada', hoje);
 
   if (error) {
     console.error('Erro ao buscar ordens pendentes no Supabase:', error);
@@ -43,6 +48,9 @@ export async function baixarCargaDoDia() {
   const mapaLocaisPorId = new Map();
   const mapaLocaisPorNum = new Map();
 
+  // IDs de OS antigas (data != hoje) já sincronizadas → serão removidas do Dexie
+  const idsParaRemover = [];
+
   for (const local of todasLocais) {
     const isPendenteEnvio =
       local.status_sincronizacao === 'pendente' ||
@@ -58,6 +66,12 @@ export async function baixarCargaDoDia() {
       if (local.numero_os) {
         pendentesEnvioIds.add(String(local.numero_os));
       }
+    } else {
+      // OS de outro dia e já sincronizada → marcar para remoção
+      const dataLocal = local.data_agendada || '';
+      if (dataLocal && dataLocal !== hoje) {
+        idsParaRemover.push(local.id);
+      }
     }
 
     if (local.id !== undefined && local.id !== null) {
@@ -66,6 +80,21 @@ export async function baixarCargaDoDia() {
     if (local.numero_os) {
       mapaLocaisPorNum.set(String(local.numero_os), local);
     }
+  }
+
+  // Limpa OS antigas sincronizadas e seus equipamentos do Dexie
+  if (idsParaRemover.length > 0) {
+    for (const idRemover of idsParaRemover) {
+      try {
+        // Remove equipamentos vinculados
+        await db.equipamentos.where({ os_id: idRemover }).delete();
+        // Remove a OS
+        await db.ordens_servico.delete(idRemover);
+      } catch (delErr) {
+        console.warn(`Aviso ao limpar OS antiga ${idRemover} do Dexie:`, delErr);
+      }
+    }
+    console.log(`Limpeza: ${idsParaRemover.length} OS de dias anteriores removidas do cache local.`);
   }
 
   // 4. Merge inteligente: NUNCA sobrescreve O.S. pendente; adiciona novas; atualiza apenas sincronizadas

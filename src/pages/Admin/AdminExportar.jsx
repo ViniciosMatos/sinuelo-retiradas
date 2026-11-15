@@ -355,9 +355,6 @@ export default function AdminExportar() {
           <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
             <div className="flex items-start justify-between mb-3">
               <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Total O.S.</span>
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-brand flex items-center justify-center">
-                <TrendingUp className="w-4 h-4" />
-              </div>
             </div>
             <p className="text-3xl font-black text-brand-dark">{metricas.total}</p>
             <p className="text-xs text-slate-500 mt-1">no período filtrado</p>
@@ -367,9 +364,6 @@ export default function AdminExportar() {
           <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
             <div className="flex items-start justify-between mb-3">
               <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Taxa Sucesso</span>
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-action-success flex items-center justify-center">
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
             </div>
             <p className="text-3xl font-black text-emerald-700">{metricas.taxaSucesso}%</p>
             <p className="text-xs text-slate-500 mt-1">{metricas.concluidas} concluídas</p>
@@ -379,9 +373,6 @@ export default function AdminExportar() {
           <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
             <div className="flex items-start justify-between mb-3">
               <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">MACs Recolhidos</span>
-              <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
-                <Package className="w-4 h-4" />
-              </div>
             </div>
             <p className="text-3xl font-black text-teal-700">{metricas.macsRecolhidos}</p>
             <p className="text-xs text-slate-500 mt-1">equipamentos com foi_recolhido = true</p>
@@ -391,9 +382,6 @@ export default function AdminExportar() {
           <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200">
             <div className="flex items-start justify-between mb-3">
               <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Auditoria</span>
-              <div className="w-9 h-9 rounded-xl bg-amber-50 text-action-alert flex items-center justify-center">
-                <ShieldAlert className="w-4 h-4" />
-              </div>
             </div>
             <p className="text-3xl font-black text-amber-700">{metricas.osVerificacao}</p>
             <p className="text-xs text-slate-500 mt-1">O.S. requerem verificação</p>

@@ -39,15 +39,15 @@ export default function Login() {
       <div className="w-full max-w-sm">
         {/* Identidade Visual */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand text-white shadow-lg mb-3">
-            <Lock className="w-7 h-7" />
+          <div className="inline-flex justify-center w-40">
+            <img src="/public/logo_sinuelo_rede.png" alt="Logo Sinuelo Soluções" />
           </div>
           <h1 className="text-2xl font-black text-brand-dark tracking-tight">
             Acesso do Técnico
           </h1>
-          <p className="text-xs text-brand-gray mt-1 font-medium">
+          {/* <p className="text-xs text-brand-gray mt-1 font-medium">
             Sinuelo Soluções em Internet
-          </p>
+          </p> */}
         </div>
 
         {/* Card do Formulário */}

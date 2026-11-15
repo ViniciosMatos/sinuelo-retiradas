@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../supabase';
-import { getTodayBR, formatDateBR, addDiasBR } from '../../utils/dateUtils';
+import React, { useState, useEffect, useCallback } from "react";
+import { supabase } from "../../supabase";
+import { getTodayBR, formatDateBR, addDiasBR } from "../../utils/dateUtils";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   CalendarDays,
   Users,
   RefreshCw,
@@ -19,7 +20,16 @@ import {
   Save,
   Loader2,
   Cloud,
-} from 'lucide-react';
+  Camera,
+  MessageCircle,
+  Router,
+  Ban,
+  Eye,
+  Image,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+} from "lucide-react";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -27,31 +37,31 @@ const formatarData = formatDateBR;
 const addDias = addDiasBR;
 const hojeISO = getTodayBR;
 
-
 // ─── Modal de Edição ─────────────────────────────────────────────────────────
 
 function ModalEditarOS({ os, tecnicos, onClose, onSaved }) {
   const [form, setForm] = useState({
-    endereco: os.endereco || '',
-    bairro: os.bairro || '',
-    cidade: os.cidade || '',
-    observacao_cliente: os.observacao_cliente || '',
-    horario_marcado: os.horario_marcado || '',
-    data_agendada: os.data_agendada || '',
-    tecnico_id: os.tecnico_id || '',
-    status: os.status || 'PENDENTE',
+    endereco: os.endereco || "",
+    bairro: os.bairro || "",
+    cidade: os.cidade || "",
+    observacao_cliente: os.observacao_cliente || "",
+    horario_marcado: os.horario_marcado || "",
+    data_agendada: os.data_agendada || "",
+    tecnico_id: os.tecnico_id || "",
+    status: os.status || "PENDENTE",
   });
   const [salvando, setSalvando] = useState(false);
-  const [erroModal, setErroModal] = useState('');
+  const [erroModal, setErroModal] = useState("");
 
-  const handleChange = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const handleChange = (field) => (e) =>
+    setForm((f) => ({ ...f, [field]: e.target.value }));
 
   const handleSalvar = async () => {
     setSalvando(true);
-    setErroModal('');
+    setErroModal("");
     try {
       const { error } = await supabase
-        .from('ordens_servico')
+        .from("ordens_servico")
         .update({
           endereco: form.endereco,
           bairro: form.bairro,
@@ -62,26 +72,29 @@ function ModalEditarOS({ os, tecnicos, onClose, onSaved }) {
           tecnico_id: form.tecnico_id || null,
           status: form.status,
         })
-        .eq('id', os.id);
+        .eq("id", os.id);
 
       if (error) throw error;
       onSaved();
       onClose();
     } catch (e) {
-      setErroModal(e.message || 'Erro ao salvar.');
+      setErroModal(e.message || "Erro ao salvar.");
     } finally {
       setSalvando(false);
     }
   };
 
-  const labelCls = 'block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1';
+  const labelCls =
+    "block text-xs font-bold text-slate-600 uppercase tracking-wider mb-1";
   const inputCls =
-    'w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors';
+    "w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors";
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
@@ -106,16 +119,28 @@ function ModalEditarOS({ os, tecnicos, onClose, onSaved }) {
           {/* Endereço */}
           <div>
             <label className={labelCls}>Endereço</label>
-            <input className={inputCls} value={form.endereco} onChange={handleChange('endereco')} />
+            <input
+              className={inputCls}
+              value={form.endereco}
+              onChange={handleChange("endereco")}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Bairro</label>
-              <input className={inputCls} value={form.bairro} onChange={handleChange('bairro')} />
+              <input
+                className={inputCls}
+                value={form.bairro}
+                onChange={handleChange("bairro")}
+              />
             </div>
             <div>
               <label className={labelCls}>Cidade</label>
-              <input className={inputCls} value={form.cidade} onChange={handleChange('cidade')} />
+              <input
+                className={inputCls}
+                value={form.cidade}
+                onChange={handleChange("cidade")}
+              />
             </div>
           </div>
 
@@ -123,10 +148,10 @@ function ModalEditarOS({ os, tecnicos, onClose, onSaved }) {
           <div>
             <label className={labelCls}>Observação do Cliente</label>
             <textarea
-              className={inputCls + ' resize-none'}
+              className={inputCls + " resize-none"}
               rows={3}
               value={form.observacao_cliente}
-              onChange={handleChange('observacao_cliente')}
+              onChange={handleChange("observacao_cliente")}
             />
           </div>
 
@@ -134,18 +159,32 @@ function ModalEditarOS({ os, tecnicos, onClose, onSaved }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Data Agendada</label>
-              <input type="date" className={inputCls} value={form.data_agendada} onChange={handleChange('data_agendada')} />
+              <input
+                type="date"
+                className={inputCls}
+                value={form.data_agendada}
+                onChange={handleChange("data_agendada")}
+              />
             </div>
             <div>
               <label className={labelCls}>Horário Marcado</label>
-              <input type="time" className={inputCls} value={form.horario_marcado} onChange={handleChange('horario_marcado')} />
+              <input
+                type="time"
+                className={inputCls}
+                value={form.horario_marcado}
+                onChange={handleChange("horario_marcado")}
+              />
             </div>
           </div>
 
           {/* Técnico */}
           <div>
             <label className={labelCls}>Técnico Responsável</label>
-            <select className={inputCls} value={form.tecnico_id} onChange={handleChange('tecnico_id')}>
+            <select
+              className={inputCls}
+              value={form.tecnico_id}
+              onChange={handleChange("tecnico_id")}
+            >
               <option value="">— Não atribuído —</option>
               {tecnicos.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -158,7 +197,11 @@ function ModalEditarOS({ os, tecnicos, onClose, onSaved }) {
           {/* Status */}
           <div>
             <label className={labelCls}>Status</label>
-            <select className={inputCls} value={form.status} onChange={handleChange('status')}>
+            <select
+              className={inputCls}
+              value={form.status}
+              onChange={handleChange("status")}
+            >
               <option value="PENDENTE">Pendente</option>
               <option value="CONCLUIDA">Concluída</option>
               <option value="IMPRODUTIVA">Improdutiva</option>
@@ -188,7 +231,11 @@ function ModalEditarOS({ os, tecnicos, onClose, onSaved }) {
             disabled={salvando}
             className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-brand hover:bg-brand-light disabled:opacity-60 transition-all flex items-center gap-2"
           >
-            {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {salvando ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
             Salvar Alterações
           </button>
         </div>
@@ -197,26 +244,193 @@ function ModalEditarOS({ os, tecnicos, onClose, onSaved }) {
   );
 }
 
+// ─── Modal de Zoom de Imagem com Controles ───────────────────────────────────
+
+function ModalZoomFoto({ fotoUrl, titulo, onClose }) {
+  const [zoom, setZoom] = useState(1);
+  const [rotacao, setRotacao] = useState(0);
+  const [posicao, setPosicao] = useState({ x: 0, y: 0 });
+  const [arrastando, setArrastando] = useState(false);
+  const [inicioArrasto, setInicioArrasto] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  // Zoom via Scroll do Mouse (Wheel)
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.2 : -0.2;
+    setZoom((z) => Math.min(5, Math.max(0.5, Number((z + delta).toFixed(2)))));
+  };
+
+  // Início do Arraste (Click com botão esquerdo)
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return; // Apenas botão esquerdo
+    e.preventDefault();
+    setArrastando(true);
+    setInicioArrasto({
+      x: e.clientX - posicao.x,
+      y: e.clientY - posicao.y,
+    });
+  };
+
+  // Movimento do Arraste
+  const handleMouseMove = (e) => {
+    if (!arrastando) return;
+    setPosicao({
+      x: e.clientX - inicioArrasto.x,
+      y: e.clientY - inicioArrasto.y,
+    });
+  };
+
+  // Término do Arraste
+  const handleMouseUp = () => {
+    setArrastando(false);
+  };
+
+  const handleReset = () => {
+    setZoom(1);
+    setRotacao(0);
+    setPosicao({ x: 0, y: 0 });
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in select-none"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+    >
+      {/* Barra superior de controles */}
+      <div className="w-full max-w-4xl flex items-center justify-between text-white pb-3 px-2 z-10">
+        <div className="flex items-center gap-2">
+          <Image className="w-4 h-4 text-emerald-400" />
+          <span className="text-sm font-bold truncate">
+            {titulo || "Foto do Equipamento"}
+          </span>
+          <span className="text-[11px] text-slate-400 hidden sm:inline ml-2">
+            (Scroll para zoom • Arraste com botão esquerdo)
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              setZoom((z) => Math.max(0.5, Number((z - 0.25).toFixed(2))))
+            }
+            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+            title="Reduzir zoom"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <span className="text-xs font-mono font-bold w-12 text-center">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setZoom((z) => Math.min(5, Number((z + 0.25).toFixed(2))))
+            }
+            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+            title="Aumentar zoom"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setRotacao((r) => (r + 90) % 360)}
+            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+            title="Girar 90°"
+          >
+            <RotateCw className="w-4 h-4" />
+          </button>
+          {(zoom !== 1 ||
+            rotacao !== 0 ||
+            posicao.x !== 0 ||
+            posicao.y !== 0) && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="px-2 py-1 text-xs rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer font-semibold"
+              title="Redefinir visualização"
+            >
+              Resetar
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-lg bg-white/20 hover:bg-red-600 text-white transition-colors ml-2 cursor-pointer"
+            title="Fechar (Esc)"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Área da foto interativa */}
+      <div
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        className={`relative w-full max-w-4xl h-[78vh] overflow-hidden rounded-2xl bg-black/60 flex items-center justify-center border border-white/15 shadow-2xl ${
+          arrastando ? "cursor-grabbing" : "cursor-grab"
+        }`}
+      >
+        <img
+          src={fotoUrl}
+          alt={titulo || "Equipamento"}
+          draggable={false}
+          style={{
+            transform: `translate(${posicao.x}px, ${posicao.y}px) scale(${zoom}) rotate(${rotacao}deg)`,
+            transition: arrastando ? "none" : "transform 0.1s ease-out",
+          }}
+          className="max-h-[75vh] max-w-[85vw] object-contain pointer-events-none"
+        />
+      </div>
+    </div>
+  );
+}
+
 // ─── Card Admin ──────────────────────────────────────────────────────────────
 
-function CardOSAdmin({ os, tecnicos, onEditar }) {
-  const [contatosAbertos, setContatosAbertos] = useState(false);
+function CardOSAdmin({ os, tecnicos, onEditar, somenteLeitura }) {
+  const [expandido, setExpandido] = useState(false);
+  const [fotoModal, setFotoModal] = useState(null); // { url, titulo }
   const temHorario = Boolean(os.horario_marcado?.trim());
   const obsCliente = os.observacao_cliente || os.obs_cliente;
   const temObs = Boolean(obsCliente?.trim());
   const nomeTecnico = tecnicos.find((t) => t.id === os.tecnico_id);
 
+  const isEncerrada = os.status === "CONCLUIDA" || os.status === "IMPRODUTIVA";
+  const equipamentos = os.equipamentos || [];
+  const equipNormais = equipamentos.filter((e) => e.mac_esperado !== "EXTRA");
+  const equipExtras = equipamentos.filter((e) => e.mac_esperado === "EXTRA");
+
   const statusBadge = () => {
-    if (os.status === 'CONCLUIDA')
+    if (os.status === "CONCLUIDA")
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
           <CheckCircle className="w-3.5 h-3.5" /> Concluída
         </span>
       );
-    if (os.status === 'IMPRODUTIVA')
+    if (os.status === "IMPRODUTIVA")
       return (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-red-100 text-red-800 border border-red-300">
           <XCircle className="w-3.5 h-3.5" /> Improdutiva
+        </span>
+      );
+    if (somenteLeitura)
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+          <Ban className="w-3.5 h-3.5" /> Não Encerrada
         </span>
       );
     return (
@@ -226,10 +440,27 @@ function CardOSAdmin({ os, tecnicos, onEditar }) {
     );
   };
 
+  const podeEditar = !somenteLeitura && !isEncerrada;
+
   return (
-    <div className={`relative w-full overflow-hidden rounded-xl bg-white shadow-md border border-slate-200 flex text-left`}>
+    <div
+      className={`relative w-full overflow-hidden rounded-xl bg-white shadow-md border transition-all ${
+        isEncerrada && os.status === "CONCLUIDA"
+          ? "border-emerald-200"
+          : isEncerrada && os.status === "IMPRODUTIVA"
+            ? "border-red-200"
+            : somenteLeitura
+              ? "border-amber-200"
+              : "border-slate-200"
+      } flex flex-col text-left`}
+    >
       {/* Tarja lateral */}
-      {temHorario && <div className="w-2.5 bg-action-alert flex-shrink-0" aria-hidden="true" />}
+      {temHorario && (
+        <div
+          className="w-full h-1 bg-action-alert flex-shrink-0"
+          aria-hidden="true"
+        />
+      )}
 
       <div className="flex-1 p-4 flex flex-col gap-2.5">
         {/* Cabeçalho */}
@@ -266,7 +497,7 @@ function CardOSAdmin({ os, tecnicos, onEditar }) {
         <div className="flex items-start gap-2">
           <User className="w-5 h-5 text-brand mt-0.5 flex-shrink-0" />
           <h3 className="font-bold text-base text-brand-dark leading-snug break-words">
-            {os.cliente_nome || 'Cliente não informado'}
+            {os.cliente_nome || "Cliente não informado"}
           </h3>
         </div>
 
@@ -274,13 +505,13 @@ function CardOSAdmin({ os, tecnicos, onEditar }) {
         <div className="flex items-start gap-2 text-sm text-slate-600">
           <MapPin className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
           <p className="line-clamp-2 leading-relaxed">
-            {os.endereco || 'Endereço não informado'}
-            {os.bairro ? ` - ${os.bairro}` : ''}
-            {os.cidade ? `, ${os.cidade}` : ''}
+            {os.endereco || "Endereço não informado"}
+            {os.bairro ? ` - ${os.bairro}` : ""}
+            {os.cidade ? `, ${os.cidade}` : ""}
           </p>
         </div>
 
-        {/* Contatos expansíveis */}
+        {/* Contatos */}
         {os.telefone_1 && (
           <div className="text-xs text-slate-600 font-medium">
             {os.telefone_1}
@@ -300,19 +531,274 @@ function CardOSAdmin({ os, tecnicos, onEditar }) {
           </div>
         )}
 
-        {/* Rodapé com botão Editar */}
-        <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-1.5" />
-          <button
-            type="button"
-            onClick={() => onEditar(os)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-brand hover:bg-brand-light active:scale-95 transition-all shadow-sm"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-            Editar O.S.
-          </button>
+        {/* ─── Painel Expansível de Detalhes / Encerramento ──────────── */}
+        {expandido && (
+          <div className="mt-2 pt-3 border-t border-slate-200 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+            {/* Info de encerramento para CONCLUÍDA */}
+            {os.status === "CONCLUIDA" && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Encerrada como Concluída</span>
+                  {os.concluido_em && (
+                    <span className="ml-auto text-[10px] font-medium text-emerald-600">
+                      {new Date(os.concluido_em).toLocaleString("pt-BR")}
+                    </span>
+                  )}
+                </div>
+
+                {os.requer_verificacao && (
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-800 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>Requer verificação administrativa</span>
+                  </div>
+                )}
+
+                {os.observacao_tecnico && (
+                  <div className="text-xs text-slate-700 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-wider block mb-1">
+                      Obs. do Técnico
+                    </span>
+                    {os.observacao_tecnico}
+                  </div>
+                )}
+
+                {/* Galeria de Fotos dos Equipamentos Recolhidos (2 por linha com zoom) */}
+                {equipamentos.filter((e) => e.foto_url).length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    <span className="font-bold text-[10px] text-slate-500 uppercase tracking-wider block">
+                      Fotos dos Equipamentos Recolhidos (
+                      {equipamentos.filter((e) => e.foto_url).length})
+                    </span>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {equipamentos
+                        .filter((e) => e.foto_url)
+                        .map((eq, idx) => {
+                          const macLabel =
+                            eq.mac_esperado === "EXTRA"
+                              ? `EXTRA #${idx + 1}`
+                              : eq.mac_esperado;
+                          return (
+                            <div
+                              key={eq.id || idx}
+                              className="group relative bg-slate-50 rounded-xl border border-slate-200 overflow-hidden shadow-2xs hover:border-brand/50 transition-all flex flex-col"
+                            >
+                              {/* Container da Foto com botão de Zoom */}
+                              <div
+                                onClick={() =>
+                                  setFotoModal({
+                                    url: eq.foto_url,
+                                    titulo: `Equipamento MAC: ${macLabel}`,
+                                  })
+                                }
+                                className="relative aspect-4/3 w-full bg-slate-200 cursor-pointer overflow-hidden flex items-center justify-center"
+                                title="Clique para expandir e dar zoom"
+                              >
+                                <img
+                                  src={eq.foto_url}
+                                  alt={`MAC ${macLabel}`}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                  loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                                  <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/75 text-white p-1.5 rounded-lg flex items-center gap-1 text-[11px] font-bold backdrop-blur-xs">
+                                    <ZoomIn className="w-3.5 h-3.5" />
+                                    <span>Zoom</span>
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* MAC e Identificação abaixo da Foto */}
+                              <div className="p-2 bg-white flex flex-col gap-0.5 border-t border-slate-100">
+                                <span
+                                  className="font-mono text-xs font-bold text-slate-900 truncate"
+                                  title={macLabel}
+                                >
+                                  {macLabel}
+                                </span>
+                                <span className="text-[10px] font-semibold text-emerald-700 flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                                  {eq.mac_esperado === "EXTRA"
+                                    ? "Aparelho Extra"
+                                    : "Recolhido"}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Lista Textual de Equipamentos */}
+                {equipNormais.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="font-bold text-[10px] text-slate-500 uppercase tracking-wider block">
+                      Status da Relação de Equipamentos ({equipNormais.length})
+                    </span>
+                    {equipNormais.map((eq) => (
+                      <div
+                        key={eq.id}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs ${
+                          eq.foi_recolhido
+                            ? "bg-emerald-50/70 border-emerald-200"
+                            : "bg-amber-50/70 border-amber-200"
+                        }`}
+                      >
+                        <Router className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                        <span className="font-mono font-bold text-slate-800">
+                          {eq.mac_esperado}
+                        </span>
+                        <span
+                          className={`ml-auto font-bold text-[10px] uppercase ${
+                            eq.foi_recolhido
+                              ? "text-emerald-700"
+                              : "text-amber-700"
+                          }`}
+                        >
+                          {eq.foi_recolhido ? "✓ Recolhido" : "✗ Não entregue"}
+                        </span>
+                        {eq.foto_url && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFotoModal({
+                                url: eq.foto_url,
+                                titulo: `Equipamento MAC: ${eq.mac_esperado}`,
+                              })
+                            }
+                            className="p-1 rounded bg-white border border-slate-200 hover:border-brand text-brand transition-colors cursor-pointer"
+                            title="Ver foto com zoom"
+                          >
+                            <ZoomIn className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Extras */}
+                {equipExtras.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="font-bold text-[10px] text-purple-600 uppercase tracking-wider block">
+                      Extras ({equipExtras.length})
+                    </span>
+                    {equipExtras.map((eq) => (
+                      <div
+                        key={eq.id}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50/50 text-xs"
+                      >
+                        <Router className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                        <span className="font-bold text-purple-800">
+                          Equipamento Extra
+                        </span>
+                        {eq.foto_url && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFotoModal({
+                                url: eq.foto_url,
+                                titulo: "Equipamento Extra Recolhido",
+                              })
+                            }
+                            className="ml-auto p-1 rounded bg-white border border-purple-200 hover:border-brand text-brand transition-colors cursor-pointer"
+                            title="Ver foto com zoom"
+                          >
+                            <ZoomIn className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Info de encerramento para IMPRODUTIVA */}
+            {os.status === "IMPRODUTIVA" && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-red-800 bg-red-50 px-3 py-2 rounded-lg border border-red-200">
+                  <XCircle className="w-4 h-4" />
+                  <span>Encerrada como Improdutiva</span>
+                  {os.concluido_em && (
+                    <span className="ml-auto text-[10px] font-medium text-red-600">
+                      {new Date(os.concluido_em).toLocaleString("pt-BR")}
+                    </span>
+                  )}
+                </div>
+
+                {os.motivo_improdutiva && (
+                  <div className="text-xs text-slate-700 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-wider block mb-1">
+                      Motivo
+                    </span>
+                    {os.motivo_improdutiva}
+                  </div>
+                )}
+
+                {os.observacao_tecnico && (
+                  <div className="text-xs text-slate-700 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+                    <span className="font-bold text-slate-500 uppercase text-[10px] tracking-wider block mb-1">
+                      Obs. do Técnico
+                    </span>
+                    {os.observacao_tecnico}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Status "Não Encerrada" em dias passados */}
+            {somenteLeitura && !isEncerrada && (
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-800 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200">
+                <Ban className="w-4 h-4" />
+                <span>
+                  Esta O.S. não foi encerrada pelo técnico na data agendada.
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Rodapé único sempre embaixo no card */}
+        <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+          {/* Botão Ver Detalhes / Recolher embaixo à esquerda */}
+          {(isEncerrada || somenteLeitura) && (
+            <button
+              type="button"
+              onClick={() => setExpandido(!expandido)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 active:scale-95 transition-all cursor-pointer shadow-2xs"
+            >
+              <Eye className="w-3.5 h-3.5 text-slate-500" />
+              <span>{expandido ? "Recolher" : "Ver Detalhes"}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${expandido ? "rotate-180" : ""}`}
+              />
+            </button>
+          )}
+
+          {/* Botão Editar (apenas OS pendentes do dia corrente à direita) */}
+          {podeEditar && (
+            <button
+              type="button"
+              onClick={() => onEditar(os)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-brand hover:bg-brand-light active:scale-95 transition-all shadow-sm ml-auto cursor-pointer"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Editar O.S.
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Modal de Zoom de Foto */}
+      {fotoModal && (
+        <ModalZoomFoto
+          fotoUrl={fotoModal.url}
+          titulo={fotoModal.titulo}
+          onClose={() => setFotoModal(null)}
+        />
+      )}
     </div>
   );
 }
@@ -321,7 +807,7 @@ function CardOSAdmin({ os, tecnicos, onEditar }) {
 
 export default function AdminAgenda() {
   const [dataAtual, setDataAtual] = useState(hojeISO());
-  const [tecnicoFiltro, setTecnicoFiltro] = useState('');
+  const [tecnicoFiltro, setTecnicoFiltro] = useState("");
   const [tecnicos, setTecnicos] = useState([]);
   const [ordens, setOrdens] = useState([]);
   const [carregando, setCarregando] = useState(false);
@@ -331,33 +817,33 @@ export default function AdminAgenda() {
   useEffect(() => {
     async function fetchTecnicos() {
       const { data } = await supabase
-        .from('usuarios')
-        .select('id, nome, email')
-        .eq('role', 'TECNICO')
-        .order('nome');
+        .from("usuarios")
+        .select("id, nome, email")
+        .eq("role", "TECNICO")
+        .order("nome");
       if (data) setTecnicos(data);
     }
     fetchTecnicos();
   }, []);
 
-  // Busca ordens filtradas
+  // Busca ordens filtradas (com equipamentos para expansão de detalhes)
   const fetchOrdens = useCallback(async () => {
     setCarregando(true);
     try {
       let query = supabase
-        .from('ordens_servico')
-        .select('*')
-        .eq('data_agendada', dataAtual)
-        .order('ordem_importacao', { ascending: true });
+        .from("ordens_servico")
+        .select("*, equipamentos(*)")
+        .eq("data_agendada", dataAtual)
+        .order("ordem_importacao", { ascending: true });
 
       if (tecnicoFiltro) {
-        query = query.eq('tecnico_id', tecnicoFiltro);
+        query = query.eq("tecnico_id", tecnicoFiltro);
       }
 
       const { data, error } = await query;
       if (!error && data) setOrdens(data);
     } catch (e) {
-      console.error('Erro ao buscar ordens:', e);
+      console.error("Erro ao buscar ordens:", e);
     } finally {
       setCarregando(false);
     }
@@ -368,12 +854,15 @@ export default function AdminAgenda() {
   }, [fetchOrdens]);
 
   const isHoje = dataAtual === hojeISO();
+  const isDiaPassado = dataAtual < hojeISO();
 
   // Contadores rápidos
   const total = ordens.length;
-  const pendentes = ordens.filter((o) => !o.status || o.status === 'PENDENTE').length;
-  const concluidas = ordens.filter((o) => o.status === 'CONCLUIDA').length;
-  const improdutivas = ordens.filter((o) => o.status === 'IMPRODUTIVA').length;
+  const pendentes = ordens.filter(
+    (o) => !o.status || o.status === "PENDENTE",
+  ).length;
+  const concluidas = ordens.filter((o) => o.status === "CONCLUIDA").length;
+  const improdutivas = ordens.filter((o) => o.status === "IMPRODUTIVA").length;
 
   return (
     <div className="space-y-5">
@@ -381,7 +870,9 @@ export default function AdminAgenda() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <CalendarDays className="w-5 h-5 text-brand" />
-          <span className="font-bold text-slate-700 text-sm">Agenda do Dia</span>
+          <span className="font-bold text-slate-700 text-sm">
+            Agenda do Dia
+          </span>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -422,7 +913,11 @@ export default function AdminAgenda() {
 
           <span className="text-sm font-semibold text-slate-500">
             {formatarData(dataAtual)}
-            {isHoje && <span className="ml-1.5 text-xs text-emerald-600 font-bold">(hoje)</span>}
+            {isHoje && (
+              <span className="ml-1.5 text-xs text-emerald-600 font-bold">
+                (hoje)
+              </span>
+            )}
           </span>
         </div>
 
@@ -449,7 +944,9 @@ export default function AdminAgenda() {
             title="Atualizar"
             className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`w-4 h-4 ${carregando ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`w-4 h-4 ${carregando ? "animate-spin" : ""}`}
+            />
           </button>
         </div>
       </div>
@@ -457,13 +954,38 @@ export default function AdminAgenda() {
       {/* Métricas rápidas */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total', value: total, color: 'text-slate-700', bg: 'bg-slate-50' },
-          { label: 'Pendentes', value: pendentes, color: 'text-amber-700', bg: 'bg-amber-50' },
-          { label: 'Concluídas', value: concluidas, color: 'text-emerald-700', bg: 'bg-emerald-50' },
-          { label: 'Improdutivas', value: improdutivas, color: 'text-red-700', bg: 'bg-red-50' },
+          {
+            label: "Total",
+            value: total,
+            color: "text-slate-700",
+            bg: "bg-slate-50",
+          },
+          {
+            label: "Pendentes",
+            value: pendentes,
+            color: "text-amber-700",
+            bg: "bg-amber-50",
+          },
+          {
+            label: "Concluídas",
+            value: concluidas,
+            color: "text-emerald-700",
+            bg: "bg-emerald-50",
+          },
+          {
+            label: "Improdutivas",
+            value: improdutivas,
+            color: "text-red-700",
+            bg: "bg-red-50",
+          },
         ].map((m) => (
-          <div key={m.label} className={`${m.bg} rounded-xl border border-slate-200 p-3 text-center`}>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{m.label}</p>
+          <div
+            key={m.label}
+            className={`${m.bg} rounded-xl border border-slate-200 p-3 text-center`}
+          >
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              {m.label}
+            </p>
             <p className={`text-2xl font-black mt-0.5 ${m.color}`}>{m.value}</p>
           </div>
         ))}
@@ -478,21 +1000,31 @@ export default function AdminAgenda() {
       ) : ordens.length === 0 ? (
         <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
           <CalendarDays className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-          <p className="text-sm font-bold text-slate-600">Nenhuma O.S. para {formatarData(dataAtual)}</p>
+          <p className="text-sm font-bold text-slate-600">
+            Nenhuma O.S. para {formatarData(dataAtual)}
+          </p>
           <p className="text-xs text-slate-400 mt-1">
-            {tecnicoFiltro ? 'Tente remover o filtro de técnico.' : 'Nenhuma ordem agendada para essa data.'}
+            {tecnicoFiltro
+              ? "Tente remover o filtro de técnico."
+              : "Nenhuma ordem agendada para essa data."}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {ordens.map((os) => (
-            <CardOSAdmin
-              key={os.id}
-              os={os}
-              tecnicos={tecnicos}
-              onEditar={setOsEditando}
-            />
-          ))}
+          {ordens.map((os) => {
+            const isEncerrada =
+              os.status === "CONCLUIDA" || os.status === "IMPRODUTIVA";
+            const somenteLeitura = isDiaPassado || isEncerrada;
+            return (
+              <CardOSAdmin
+                key={os.id}
+                os={os}
+                tecnicos={tecnicos}
+                onEditar={setOsEditando}
+                somenteLeitura={somenteLeitura}
+              />
+            );
+          })}
         </div>
       )}
 

@@ -23,21 +23,19 @@ import {
 } from 'lucide-react';
 
 export default function ModalDetalhesOS({ os, onClose }) {
-  if (!os) return null;
-
   // 2. Retenção da Aba de Encerramento Pós-Câmera
   // 'detalhes' | 'concluir' | 'improdutiva'
   const [abaAtiva, setAbaAtiva] = useState(() => {
-    return sessionStorage.getItem(`modal_aba_ativa_${os?.id}`) || 'detalhes';
+    return (os?.id && sessionStorage.getItem(`modal_aba_ativa_${os.id}`)) || 'detalhes';
   });
 
   const mudarAba = (novaAba) => {
     setAbaAtiva(novaAba);
     try {
       if (novaAba && novaAba !== 'detalhes') {
-        sessionStorage.setItem(`modal_aba_ativa_${os?.id}`, novaAba);
+        if (os?.id) sessionStorage.setItem(`modal_aba_ativa_${os.id}`, novaAba);
       } else {
-        sessionStorage.removeItem(`modal_aba_ativa_${os?.id}`);
+        if (os?.id) sessionStorage.removeItem(`modal_aba_ativa_${os.id}`);
       }
     } catch (e) {
       console.warn('Erro ao salvar aba ativa no sessionStorage:', e);
@@ -46,7 +44,10 @@ export default function ModalDetalhesOS({ os, onClose }) {
 
   const handleFecharModal = () => {
     try {
-      sessionStorage.removeItem(`modal_aba_ativa_${os?.id}`);
+      if (os?.id) {
+        sessionStorage.removeItem(`modal_aba_ativa_${os.id}`);
+        sessionStorage.removeItem(`aparelhos_extras_${os.id}`);
+      }
     } catch (e) {}
     onClose();
   };
@@ -59,24 +60,45 @@ export default function ModalDetalhesOS({ os, onClose }) {
   const [comprimindoKey, setComprimindoKey] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [equipamentosPrevistos, setEquipamentosPrevistos] = useState([]);
-  const [aparelhosExtras, setAparelhosExtras] = useState([]);
+
+  // Aparelhos extras com persistência no sessionStorage para sobreviver à abertura da câmera mobile
+  const [aparelhosExtras, setAparelhosExtras] = useState(() => {
+    if (!os?.id) return [];
+    try {
+      const salvo = sessionStorage.getItem(`aparelhos_extras_${os.id}`);
+      return salvo ? JSON.parse(salvo) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const salvarAparelhosExtras = (novosExtras) => {
+    setAparelhosExtras(novosExtras);
+    if (os?.id) {
+      try {
+        sessionStorage.setItem(`aparelhos_extras_${os.id}`, JSON.stringify(novosExtras));
+      } catch (err) {
+        console.warn('Erro ao salvar aparelhos extras:', err);
+      }
+    }
+  };
 
   // Fluxo de Improdutiva
   const [motivoImprodutiva, setMotivoImprodutiva] = useState('Cliente ausente');
   const [obsTecnico, setObsTecnico] = useState('');
 
-  // Endereço e Google Maps
-  const enderecoCompleto = `${os.endereco || ''}${os.bairro ? ` - ${os.bairro}` : ''}${os.cidade ? `, ${os.cidade}` : ''}`;
-  const mapsUrl = os.link_maps || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoCompleto)}`;
+  // Endereço e Google Maps (com encadeamento opcional seguro)
+  const enderecoCompleto = `${os?.endereco || ''}${os?.bairro ? ` - ${os.bairro}` : ''}${os?.cidade ? `, ${os.cidade}` : ''}`;
+  const mapsUrl = os?.link_maps || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoCompleto)}`;
   
   // Lista de Contatos (CONTATO_1 e CONTATO_2)
   const listaContatos = [];
-  const c1 = os.telefone_1;
-  const c2 = os.telefone_2;
+  const c1 = os?.telefone_1;
+  const c2 = os?.telefone_2;
   if (c1 && String(c1).trim()) listaContatos.push(String(c1).trim());
   if (c2 && String(c2).trim() && String(c2).trim() !== String(c1).trim()) listaContatos.push(String(c2).trim());
 
-  const obsCliente = os.observacao_cliente;
+  const obsCliente = os?.observacao_cliente;
 
   // Carrega fotos rascunho persistidas no Dexie caso o app da câmera tenha reciclado a RAM
   useEffect(() => {
@@ -342,10 +364,17 @@ export default function ModalDetalhesOS({ os, onClose }) {
 
   const handleAdicionarAparelhoExtra = () => {
     const novoIndex = aparelhosExtras.length + 1;
-    setAparelhosExtras((prev) => [
-      ...prev,
-      { key: `extra-${Date.now()}`, mac_esperado: `Aparelho Extra #${novoIndex}`, isExtra: true },
-    ]);
+    const novos = [
+      ...aparelhosExtras,
+      { key: `extra-${os?.id || 'os'}-${Date.now()}-${novoIndex}`, mac_esperado: `Aparelho Extra #${novoIndex}`, isExtra: true },
+    ];
+    salvarAparelhosExtras(novos);
+  };
+
+  const handleRemoverAparelhoExtra = (keyParaRemover) => {
+    const novos = aparelhosExtras.filter((item) => item.key !== keyParaRemover);
+    salvarAparelhosExtras(novos);
+    handleRemoverFotoEquipamento(keyParaRemover);
   };
 
   // Lista unificada para o formulário de recolhimento
@@ -424,22 +453,45 @@ export default function ModalDetalhesOS({ os, onClose }) {
         .map((item) => (item instanceof Blob ? item : (item?.file || item?.blob)))
         .filter((f) => f instanceof Blob);
 
-      // Salva no Dexie local com status_sincronizacao = 'pendente'
-      await db.ordens_servico.update(os.id, {
-        status: 'CONCLUIDA',
-        status_sincronizacao: 'pendente',
-        sync_status: 'pendente',
-        sincronizado: false,
-        requer_verificacao: requerVerificacao,
-        fotos_recolhimento: arrayFotosBlobs,
-        fotos_por_equipamento: fotos,
-        equipamentos_nao_entregues: naoEntregues,
-        concluido_em: new Date().toISOString(),
-      });
+      // Regra de Negócio: Se TODOS os equipamentos forem marcados como "não entregue" (nenhuma foto anexada),
+      // a O.S. deve ser automaticamente encerrada como IMPRODUTIVA com o motivo equivalente.
+      const todosNaoEntregues = totalFotosAnexadas === 0 && temNaoEntregue;
 
-      // Limpa retenção de aba
+      if (todosNaoEntregues) {
+        await db.ordens_servico.update(os.id, {
+          status: 'IMPRODUTIVA',
+          status_sincronizacao: 'pendente',
+          sync_status: 'pendente',
+          sincronizado: false,
+          requer_verificacao: false,
+          fotos_recolhimento: null,
+          fotos_por_equipamento: null,
+          equipamentos_nao_entregues: naoEntregues,
+          motivo_improdutiva: 'Equipamento não localizado',
+          observacao_tecnico: 'Todos os equipamentos marcados como não entregues pelo cliente.',
+          concluido_em: new Date().toISOString(),
+        });
+      } else {
+        // Salva no Dexie local como CONCLUIDA com status_sincronizacao = 'pendente'
+        await db.ordens_servico.update(os.id, {
+          status: 'CONCLUIDA',
+          status_sincronizacao: 'pendente',
+          sync_status: 'pendente',
+          sincronizado: false,
+          requer_verificacao: requerVerificacao,
+          fotos_recolhimento: arrayFotosBlobs,
+          fotos_por_equipamento: fotos,
+          equipamentos_nao_entregues: naoEntregues,
+          concluido_em: new Date().toISOString(),
+        });
+      }
+
+      // Limpa retenção de aba e extras temporários
       try {
-        sessionStorage.removeItem(`modal_aba_ativa_${os?.id}`);
+        if (os?.id) {
+          sessionStorage.removeItem(`modal_aba_ativa_${os.id}`);
+          sessionStorage.removeItem(`aparelhos_extras_${os.id}`);
+        }
       } catch (err) {}
 
       // Fecha o modal instantaneamente (otimista)
@@ -489,9 +541,12 @@ export default function ModalDetalhesOS({ os, onClose }) {
         }
       }
 
-      // Limpa retenção de aba
+      // Limpa retenção de aba e extras temporários
       try {
-        sessionStorage.removeItem(`modal_aba_ativa_${os?.id}`);
+        if (os?.id) {
+          sessionStorage.removeItem(`modal_aba_ativa_${os.id}`);
+          sessionStorage.removeItem(`aparelhos_extras_${os.id}`);
+        }
       } catch (err) {}
 
       // Fecha o modal instantaneamente
@@ -512,6 +567,8 @@ export default function ModalDetalhesOS({ os, onClose }) {
     setNaoEntregues({});
     mudarAba('improdutiva');
   };
+
+  if (!os) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4">
@@ -751,7 +808,8 @@ export default function ModalDetalhesOS({ os, onClose }) {
 
                 {listaRecolhimento.map((eq, idx) => {
                   const eqId = eq.id !== undefined && eq.id !== null ? String(eq.id) : (eq.key || eq.mac_esperado || `eq-${idx}`);
-                  const mac = eq.mac_esperado || 'Aparelho';
+                  const isExtra = Boolean(eq.isExtra || eq.is_extra || eq.mac_esperado === 'EXTRA');
+                  const mac = eq.mac_esperado || (isExtra ? `Aparelho Extra #${idx + 1}` : 'Aparelho');
                   const temFoto = Boolean(fotos[eqId]?.previewUrl || fotos[eqId]?.file);
                   const isNaoEntregue = Boolean(naoEntregues[eqId]);
                   const isComprimindoEste = comprimindoKey === eqId;
@@ -764,7 +822,9 @@ export default function ModalDetalhesOS({ os, onClose }) {
                           ? 'bg-white border-emerald-400 shadow-xs ring-1 ring-emerald-300' 
                           : isNaoEntregue
                             ? 'bg-amber-50/70 border-amber-300 shadow-2xs'
-                            : 'bg-white/90 border-slate-200 shadow-2xs'
+                            : isExtra
+                              ? 'bg-purple-50/50 border-purple-200 shadow-2xs'
+                              : 'bg-white/90 border-slate-200 shadow-2xs'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -774,23 +834,32 @@ export default function ModalDetalhesOS({ os, onClose }) {
                               ? 'bg-emerald-100 text-emerald-800' 
                               : isNaoEntregue
                                 ? 'bg-amber-200 text-amber-900'
-                                : 'bg-slate-100 text-slate-700'
+                                : isExtra
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : 'bg-slate-100 text-slate-700'
                           }`}>
                             {idx + 1}
                           </span>
                           <div className="overflow-hidden">
-                            <span className="font-mono text-xs font-bold text-slate-900 block truncate">
-                              {mac}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-xs font-bold text-slate-900 block truncate">
+                                {mac}
+                              </span>
+                              {isExtra && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-purple-100 text-purple-800 border border-purple-200">
+                                  Extra
+                                </span>
+                              )}
+                            </div>
                             <span className={`text-[10px] font-semibold block ${
                               temFoto 
                                 ? 'text-emerald-700' 
                                 : isNaoEntregue
                                   ? 'text-amber-800'
-                                  : 'text-slate-400'
+                                  : 'text-slate-500'
                             }`}>
                               {temFoto 
-                                ? '✓ Recolhido (com foto)' 
+                                ? 'Foto anexada' 
                                 : isNaoEntregue
                                   ? '⚠️ Não entregue pelo cliente'
                                   : 'Pendente de definição'}
@@ -800,6 +869,17 @@ export default function ModalDetalhesOS({ os, onClose }) {
 
                         {/* Duas Ações Claras: [Não Entregue] e [Tirar/Alterar Foto] */}
                         <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {isExtra && !salvando && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoverAparelhoExtra(eq.key || eqId)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors cursor-pointer"
+                              title="Remover este equipamento extra"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+
                           {/* Botão [Não Entregue] com estilo toggle/badge */}
                           <button
                             type="button"

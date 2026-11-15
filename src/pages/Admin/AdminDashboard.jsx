@@ -165,8 +165,8 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
       {/* Barra Superior Mobile (Hamburger) */}
       <header className="md:hidden bg-gray-900 text-white px-4 py-3 flex items-center justify-between border-b border-gray-800 sticky top-0 z-40">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white">
-            <Layers className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+            <img src="/public/logo_sinuelo_limpo_claro.png" alt="" srcset="" />
           </div>
           <div>
             <h1 className="font-bold text-sm tracking-tight leading-none">Sinuelo</h1>
@@ -202,8 +202,8 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
           {/* Logo / Marca */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center text-white shadow-md">
-                <Layers className="w-6 h-6" />
+              <div className="w-10 h-10 flex items-center justify-center text-white shadow-md">
+                <img src="/public/logo_sinuelo_limpo_claro.png" alt="" srcset="" />
               </div>
               <div>
                 <h2 className="font-black text-lg tracking-tight leading-none text-white">
@@ -391,9 +391,6 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
                         Produtivas de Hoje
                       </h3>
                     </div>
-                    <div className="w-11 h-11 rounded-xl bg-emerald-50 text-action-success flex items-center justify-center shadow-xs">
-                      <CheckCircle2 className="w-6 h-6" />
-                    </div>
                   </div>
 
                   <div className="mt-3">
@@ -417,9 +414,6 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
                       <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-2">
                         Produtivas do Mês
                       </h3>
-                    </div>
-                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-brand flex items-center justify-center shadow-xs">
-                      <TrendingUp className="w-6 h-6" />
                     </div>
                   </div>
 
@@ -445,9 +439,6 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
                         Pendentes de Hoje
                       </h3>
                     </div>
-                    <div className="w-11 h-11 rounded-xl bg-amber-50 text-action-alert flex items-center justify-center shadow-xs">
-                      <Clock className="w-6 h-6" />
-                    </div>
                   </div>
 
                   <div className="mt-3">
@@ -470,9 +461,6 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
                       <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-2">
                         Taxa de Produtividade (Dia)
                       </h3>
-                    </div>
-                    <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-xs">
-                      <Target className="w-6 h-6" />
                     </div>
                   </div>
 
@@ -505,9 +493,6 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
                         Taxa de Produtividade (Mês)
                       </h3>
                     </div>
-                    <div className="w-11 h-11 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shadow-xs">
-                      <Percent className="w-6 h-6" />
-                    </div>
                   </div>
 
                   <div className="mt-3 space-y-2">
@@ -538,9 +523,6 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
                       <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-2">
                         Improdutivas
                       </h3>
-                    </div>
-                    <div className="w-11 h-11 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shadow-xs">
-                      <AlertTriangle className="w-6 h-6" />
                     </div>
                   </div>
 
