@@ -166,7 +166,7 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
       <header className="md:hidden bg-gray-900 text-white px-4 py-3 flex items-center justify-between border-b border-gray-800 sticky top-0 z-40">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center">
-            <img src="/public/logo_sinuelo_limpo_claro.png" alt="" srcset="" />
+            <img src="/logo_sinuelo_limpo_claro.png" alt="" srcset="" />
           </div>
           <div>
             <h1 className="font-bold text-sm tracking-tight leading-none">Sinuelo</h1>
@@ -203,7 +203,7 @@ export default function AdminDashboard({ session, paginaInicial = 'PAINEL_GERAL'
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 flex items-center justify-center text-white shadow-md">
-                <img src="/public/logo_sinuelo_limpo_claro.png" alt="" srcset="" />
+                <img src="/logo_sinuelo_limpo_claro.png" alt="" srcset="" />
               </div>
               <div>
                 <h2 className="font-black text-lg tracking-tight leading-none text-white">

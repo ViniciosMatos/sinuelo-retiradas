@@ -40,7 +40,7 @@ export default function Login() {
         {/* Identidade Visual */}
         <div className="text-center mb-8">
           <div className="inline-flex justify-center w-40">
-            <img src="/public/logo_sinuelo_rede.png" alt="Logo Sinuelo Soluções" />
+            <img src="/logo_sinuelo_rede.png" alt="Logo Sinuelo Soluções" />
           </div>
           <h1 className="text-2xl font-black text-brand-dark tracking-tight">
             Acesso do Técnico

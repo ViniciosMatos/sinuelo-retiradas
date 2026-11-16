@@ -37,25 +37,6 @@ function formatDateBR(iso) {
   return `${d}/${m}/${y}`;
 }
 
-// ─── CSV download ────────────────────────────────────────────────────────────
-
-function downloadCSV(rows, filename) {
-  if (!rows.length) return;
-  const headers = Object.keys(rows[0]);
-  const escape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [headers.map(escape).join(','), ...rows.map((r) => headers.map((h) => escape(r[h])).join(','))];
-  const csvContent = '\uFEFF' + lines.join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
 // ─── XLSX download ───────────────────────────────────────────────────────────
 
 function downloadXLSX(rows, filename) {
@@ -405,14 +386,6 @@ export default function AdminExportar() {
 
             {rows.length > 0 && (
               <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => downloadCSV(rows, `${nomeArquivo}.csv`)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-brand text-brand hover:bg-brand hover:text-white text-sm font-bold transition-all cursor-pointer"
-                >
-                  <Download className="w-4 h-4" />
-                  Baixar CSV
-                </button>
                 <button
                   type="button"
                   onClick={() => downloadXLSX(rows, `${nomeArquivo}.xlsx`)}
